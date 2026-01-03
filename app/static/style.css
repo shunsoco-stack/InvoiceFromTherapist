@@ -230,6 +230,38 @@ input::placeholder{ color: rgba(169,180,202,.7); }
   background: rgba(0,0,0,.20);
 }
 
+/* Kiosk summary cards (per therapist, vertical) */
+.kioskSummary{ display:flex; flex-direction: column; gap: 12px; }
+.kioskSummaryCard{
+  border: 1px solid rgba(241,198,220,.95);
+  background: rgba(255,255,255,.92);
+  border-radius: 18px;
+  padding: 12px;
+  box-shadow: var(--shadow2);
+}
+.kioskSummaryHead{
+  display:flex;
+  gap: 10px;
+  align-items: flex-start;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  margin-bottom: 8px;
+}
+.kioskSummaryName{ font-weight: 900; font-size: 18px; }
+.kioskSummaryTotals{ display:flex; gap: 12px; flex-wrap: wrap; }
+.kioskSummaryTotalItem{ display:flex; gap: 8px; align-items: baseline; }
+.kioskSummaryMenus{ margin-top: 6px; }
+.kioskMenuList{
+  margin: 0;
+  padding-left: 18px;
+  display:grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 6px 12px;
+}
+@media (min-width: 860px){
+  .kioskMenuList{ grid-template-columns: repeat(3, minmax(0, 1fr)); }
+}
+
 .pickGrid{
   display:grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));

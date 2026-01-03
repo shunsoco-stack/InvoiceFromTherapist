@@ -78,23 +78,20 @@ def create_app() -> Flask:
         finally:
             conn.close()
 
-    def _kiosk_menu_breakdown(details: List[Dict[str, object]]) -> Dict[int, str]:
+    def _kiosk_menu_breakdown(details: List[Dict[str, object]]) -> Dict[int, List[str]]:
         """
-        Return per-therapist menu summary string like: "T/60×3, H/90×1"
+        Per-therapist menu list for the day.
+        - Do NOT compress as "×2" etc.
+        - If quantity > 1 (entered via admin), repeat menu name that many times.
         """
-        counts: Dict[int, Dict[str, int]] = {}
+        out: Dict[int, List[str]] = {}
         for d in details:
             tid = int(d["therapist_id"])
             name = str(d["menu_name"])
-            qty = int(d.get("quantity", 1))
-            if tid not in counts:
-                counts[tid] = {}
-            counts[tid][name] = int(counts[tid].get(name, 0)) + qty
-
-        out: Dict[int, str] = {}
-        for tid, m in counts.items():
-            parts = [f"{menu}×{qty}" for menu, qty in sorted(m.items(), key=lambda x: x[0])]
-            out[tid] = ", ".join(parts)
+            qty = max(1, int(d.get("quantity", 1)))
+            if tid not in out:
+                out[tid] = []
+            out[tid].extend([name] * qty)
         return out
 
     # ----------------
