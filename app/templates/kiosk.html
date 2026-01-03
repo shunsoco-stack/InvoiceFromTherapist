@@ -52,10 +52,39 @@
         </form>
       </section>
 
+      <section id="summary" class="card kiosk__card">
+        <h2>今日の集計 / Summary / สรุปวันนี้（{{ service_date }}）</h2>
+        <div class="table-wrap">
+          <table class="table">
+            <thead>
+              <tr>
+                <th>セラピスト</th>
+                <th>メニュー</th>
+                <th class="right">売上合計</th>
+                <th class="right">支払合計</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for s in summaries %}
+                <tr>
+                  <td>{{ s.therapist_name }}</td>
+                  <td class="mono">{{ menu_breakdown.get(s.therapist_id, "") }}</td>
+                  <td class="right mono">{{ "{:,}".format(s.sales_total) }}円</td>
+                  <td class="right mono strong">{{ "{:,}".format(s.payout_total) }}円</td>
+                </tr>
+              {% endfor %}
+              {% if summaries|length == 0 %}
+                <tr><td colspan="4" class="muted">まだ記録がありません。</td></tr>
+              {% endif %}
+            </tbody>
+          </table>
+        </div>
+      </section>
+
       <section class="card kiosk__card">
         <h2>ヘルプ / Help</h2>
         <ul class="list">
-          <li>押す順番: <b>セラピスト → メニュー → 数 → 保存</b></li>
+          <li>押す順番: <b>セラピスト → メニュー → 保存</b></li>
           <li>間違えたらもう一回入れ直して、管理者が「施術入力」で削除できます。</li>
         </ul>
       </section>

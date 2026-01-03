@@ -37,11 +37,15 @@ def create_app() -> Flask:
         conn = connect()
         try:
             therapists, menus = _load_active_therapists_and_menus(conn)
+            summaries, details = _compute_daily_summary(conn, service_date)
+            menu_breakdown = _kiosk_menu_breakdown(details)
             return render_template(
                 "kiosk.html",
                 service_date=service_date,
                 therapists=therapists,
                 menus=menus,
+                summaries=summaries,
+                menu_breakdown=menu_breakdown,
             )
         finally:
             conn.close()
@@ -70,9 +74,28 @@ def create_app() -> Flask:
                 (service_date, therapist_id, menu_id, quantity, now_iso()),
             )
             flash("Saved / บันทึกแล้ว", "ok")
-            return redirect(url_for("kiosk"))
+            return redirect(url_for("kiosk", _anchor="summary"))
         finally:
             conn.close()
+
+    def _kiosk_menu_breakdown(details: List[Dict[str, object]]) -> Dict[int, str]:
+        """
+        Return per-therapist menu summary string like: "T/60×3, H/90×1"
+        """
+        counts: Dict[int, Dict[str, int]] = {}
+        for d in details:
+            tid = int(d["therapist_id"])
+            name = str(d["menu_name"])
+            qty = int(d.get("quantity", 1))
+            if tid not in counts:
+                counts[tid] = {}
+            counts[tid][name] = int(counts[tid].get(name, 0)) + qty
+
+        out: Dict[int, str] = {}
+        for tid, m in counts.items():
+            parts = [f"{menu}×{qty}" for menu, qty in sorted(m.items(), key=lambda x: x[0])]
+            out[tid] = ", ".join(parts)
+        return out
 
     # ----------------
     # Therapists
