@@ -150,8 +150,27 @@ input::placeholder{ color: rgba(169,180,202,.7); }
 .kiosk__btn--primary{ border-color: rgba(46,204,113,.6); background: rgba(46,204,113,.14); }
 .kiosk__btn--primary:hover{ background: rgba(46,204,113,.20); }
 .kiosk__dateInput{ font-size: 18px; padding: 12px 14px; border-radius: 14px; }
+.kiosk__fixedDate{
+  font-size: 22px;
+  padding: 10px 12px;
+  border-radius: 14px;
+  border: 1px solid var(--border);
+  background: rgba(0,0,0,.20);
+  display:inline-block;
+}
 .kiosk__step{ margin-top: 16px; }
 .kiosk__actions{ margin-top: 14px; }
+
+.kioskForm{ display:flex; flex-direction: column; gap: 12px; }
+.kioskRow{ display:flex; flex-direction: column; gap: 8px; }
+.kioskLabel{ color: var(--muted); font-size: 14px; }
+.kioskSelect{
+  font-size: 20px;
+  padding: 14px 14px;
+  border-radius: 16px;
+  border: 1px solid var(--border);
+  background: rgba(0,0,0,.20);
+}
 
 .pickGrid{
   display:grid;

@@ -27,7 +27,8 @@ def create_app() -> Flask:
     # ----------------
     @app.get("/kiosk")
     def kiosk():
-        service_date = (request.args.get("date") or date.today().isoformat()).strip()
+        # シンプル運用のため日付は「今日」で固定（変更不可）
+        service_date = date.today().isoformat()
         conn = connect()
         try:
             therapists, menus = _load_active_therapists_and_menus(conn)
@@ -42,7 +43,8 @@ def create_app() -> Flask:
 
     @app.post("/kiosk/new")
     def kiosk_new():
-        service_date = (request.form.get("service_date") or date.today().isoformat()).strip()
+        # シンプル運用のため日付は「今日」で固定（変更不可）
+        service_date = date.today().isoformat()
         therapist_id = int(request.form.get("therapist_id") or "0")
         menu_id = int(request.form.get("menu_id") or "0")
         quantity = int(request.form.get("quantity") or "1")
@@ -65,7 +67,7 @@ def create_app() -> Flask:
                 (service_date, therapist_id, menu_id, quantity, now_iso()),
             )
             flash("Saved / บันทึกแล้ว", "ok")
-            return redirect(url_for("kiosk", date=service_date))
+            return redirect(url_for("kiosk"))
         finally:
             conn.close()
 

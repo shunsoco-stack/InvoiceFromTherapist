@@ -8,11 +8,8 @@
     </div>
 
     <section class="card kiosk__card">
-      <h2>日付 / Date / วันที่</h2>
-      <form class="inline kiosk__date" method="get" action="{{ url_for('kiosk') }}">
-        <input class="kiosk__dateInput" name="date" type="date" value="{{ service_date }}" />
-        <button class="btn btn--secondary kiosk__btn" type="submit">表示 / Show</button>
-      </form>
+      <h2>日付 / Date / วันที่（固定）</h2>
+      <div class="kiosk__fixedDate mono">{{ service_date }}</div>
     </section>
 
     {% if therapists|length == 0 or menus|length == 0 %}
@@ -26,37 +23,35 @@
       </section>
     {% else %}
       <section class="card kiosk__card">
-        <h2>1) セラピスト / Therapist / พนักงาน</h2>
-        <form method="post" action="{{ url_for('kiosk_new') }}">
-          <input type="hidden" name="service_date" value="{{ service_date }}" />
-
-          <div class="pickGrid">
-            {% for t in therapists %}
-              <label class="pick">
-                <input type="radio" name="therapist_id" value="{{ t.id }}" required />
-                <span class="pick__label">{{ t.name }}</span>
-              </label>
-            {% endfor %}
+        <h2>入力 / Input</h2>
+        <form class="kioskForm" method="post" action="{{ url_for('kiosk_new') }}">
+          <div class="kioskRow">
+            <div class="kioskLabel">1) セラピスト / Therapist / พนักงาน</div>
+            <select class="kioskSelect" name="therapist_id" required>
+              <option value="" selected disabled>เลือกพนักงาน / Select</option>
+              {% for t in therapists %}
+                <option value="{{ t.id }}">{{ t.name }}</option>
+              {% endfor %}
+            </select>
           </div>
 
-          <h2 class="kiosk__step">2) メニュー / Menu / เมนู</h2>
-          <div class="pickGrid pickGrid--menus">
-            {% for m in menus %}
-              <label class="pick pick--menu">
-                <input type="radio" name="menu_id" value="{{ m.id }}" required />
-                <span class="pick__label">
-                  <span class="pick__main">{{ m.name }}</span>
-                  <span class="pick__sub muted">{{ "{:,}".format(m.price) }}円</span>
-                </span>
-              </label>
-            {% endfor %}
+          <div class="kioskRow">
+            <div class="kioskLabel">2) メニュー / Menu（T/60）</div>
+            <select class="kioskSelect" name="menu_id" required>
+              <option value="" selected disabled>เลือกเมนู / Select</option>
+              {% for m in menus %}
+                <option value="{{ m.id }}">{{ m.name }}</option>
+              {% endfor %}
+            </select>
           </div>
 
-          <h2 class="kiosk__step">3) 数 / Qty / จำนวน</h2>
+          <div class="kioskRow">
+            <div class="kioskLabel">3) 数 / Qty / จำนวน</div>
           <div class="kioskQty">
             <button class="btn btn--secondary kiosk__btn kioskQty__btn" type="button" onclick="decQty()">−</button>
             <input id="qty" class="kioskQty__input" name="quantity" type="number" inputmode="numeric" value="1" min="1" />
             <button class="btn btn--secondary kiosk__btn kioskQty__btn" type="button" onclick="incQty()">＋</button>
+          </div>
           </div>
 
           <div class="actions kiosk__actions">
