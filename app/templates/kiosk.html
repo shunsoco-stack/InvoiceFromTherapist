@@ -45,15 +45,6 @@
             </select>
           </div>
 
-          <div id="qtyRow" class="kioskRow kioskRow--hidden">
-            <div class="kioskLabel">3) 数 / Qty / จำนวน</div>
-          <div class="kioskQty">
-            <button class="btn btn--secondary kiosk__btn kioskQty__btn" type="button" onclick="decQty()">−</button>
-            <input id="qty" class="kioskQty__input" name="quantity" type="number" inputmode="numeric" value="1" min="1" />
-            <button class="btn btn--secondary kiosk__btn kioskQty__btn" type="button" onclick="incQty()">＋</button>
-          </div>
-          </div>
-
           <div id="actionsRow" class="actions kiosk__actions kioskRow--hidden">
             <button class="btn kiosk__btn kiosk__btn--primary" type="submit">保存 / Save / บันทึก</button>
             <a class="btn btn--secondary kiosk__btn" href="{{ url_for('report_daily', date=service_date) }}">レポート（管理者）</a>
@@ -73,7 +64,6 @@
         const therapistSelect = document.getElementById('therapistSelect');
         const menuRow = document.getElementById('menuRow');
         const menuSelect = document.getElementById('menuSelect');
-        const qtyRow = document.getElementById('qtyRow');
         const actionsRow = document.getElementById('actionsRow');
 
         function showMenuStep() {
@@ -81,8 +71,7 @@
           menuSelect.disabled = false;
         }
 
-        function showQtyAndActions() {
-          qtyRow.classList.remove('kioskRow--hidden');
+        function showActions() {
           actionsRow.classList.remove('kioskRow--hidden');
         }
 
@@ -94,18 +83,9 @@
 
         menuSelect.addEventListener('change', () => {
           if (menuSelect.value) {
-            showQtyAndActions();
+            showActions();
           }
         });
-
-        function incQty() {
-          const el = document.getElementById('qty');
-          el.value = Math.max(1, (parseInt(el.value || '1', 10) || 1) + 1);
-        }
-        function decQty() {
-          const el = document.getElementById('qty');
-          el.value = Math.max(1, (parseInt(el.value || '1', 10) || 1) - 1);
-        }
       </script>
     {% endif %}
   </div>

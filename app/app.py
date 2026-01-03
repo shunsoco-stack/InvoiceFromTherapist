@@ -52,13 +52,11 @@ def create_app() -> Flask:
         service_date = date.today().isoformat()
         therapist_id = int(request.form.get("therapist_id") or "0")
         menu_id = int(request.form.get("menu_id") or "0")
-        quantity = int(request.form.get("quantity") or "1")
+        # シンプル運用: 1回の保存=1件として固定
+        quantity = 1
 
         if therapist_id <= 0 or menu_id <= 0:
             flash("Please select therapist and menu / กรุณาเลือกพนักงานและเมนู", "error")
-            return redirect(url_for("kiosk", date=service_date))
-        if quantity <= 0:
-            flash("Quantity must be 1+ / จำนวนต้องมากกว่า 0", "error")
             return redirect(url_for("kiosk", date=service_date))
 
         conn = connect()
