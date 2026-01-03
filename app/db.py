@@ -34,6 +34,8 @@ CREATE TABLE IF NOT EXISTS treatments (
   menu_id INTEGER NOT NULL,
   quantity INTEGER NOT NULL DEFAULT 1,
   hpb INTEGER NOT NULL DEFAULT 0, -- numeric input (e.g. HPB)
+  p INTEGER NOT NULL DEFAULT 0,   -- numeric input (P)
+  r INTEGER NOT NULL DEFAULT 0,   -- dropdown input (R) e.g. 500/1000
   price_override INTEGER,        -- nullable
   commission_type_override TEXT, -- nullable
   commission_value_override INTEGER,
@@ -85,6 +87,8 @@ def init_db() -> None:
         conn.executescript(SCHEMA_SQL)
         # Lightweight migrations for existing DBs
         _ensure_column(conn, table="treatments", column="hpb", col_def="INTEGER NOT NULL DEFAULT 0")
+        _ensure_column(conn, table="treatments", column="p", col_def="INTEGER NOT NULL DEFAULT 0")
+        _ensure_column(conn, table="treatments", column="r", col_def="INTEGER NOT NULL DEFAULT 0")
         conn.commit()
     finally:
         conn.close()

@@ -70,6 +70,18 @@
             <label>HPB（数値）</label>
             <input name="hpb" type="number" inputmode="numeric" min="0" value="0" />
           </div>
+          <div class="form-row">
+            <label>P（数値）</label>
+            <input name="p" type="number" inputmode="numeric" min="0" value="0" />
+          </div>
+          <div class="form-row">
+            <label>R（選択）</label>
+            <select name="r">
+              <option value="0" selected>なし</option>
+              <option value="500">500</option>
+              <option value="1000">1000</option>
+            </select>
+          </div>
         </div>
         <div class="actions">
           <button class="btn" type="submit">記録</button>
@@ -89,6 +101,8 @@
             <th>メニュー</th>
             <th>数量</th>
             <th>HPB</th>
+            <th>P</th>
+            <th>R</th>
             <th>メモ</th>
             <th></th>
           </tr>
@@ -101,6 +115,8 @@
               <td>{{ t.menu_name }}</td>
               <td class="mono">{{ t.quantity }}</td>
               <td class="mono">{{ t.hpb if t.hpb is not none else 0 }}</td>
+              <td class="mono">{{ t.p if t.p is not none else 0 }}</td>
+              <td class="mono">{{ t.r if t.r is not none else 0 }}</td>
               <td class="muted">{{ t.notes or "" }}</td>
               <td class="right">
                 <form method="post" action="{{ url_for('treatments_delete', treatment_id=t.id) }}" onsubmit="return confirm('削除しますか？');">
@@ -111,7 +127,7 @@
             </tr>
           {% endfor %}
           {% if treatments|length == 0 %}
-            <tr><td colspan="7" class="muted">まだ記録がありません。</td></tr>
+            <tr><td colspan="9" class="muted">まだ記録がありません。</td></tr>
           {% endif %}
         </tbody>
       </table>
