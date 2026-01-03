@@ -95,7 +95,11 @@
                   <tbody>
                     {% for it in items %}
                       <tr>
-                        <td class="kioskSheetTd mono">{{ it.menu_name }}</td>
+                        <td class="kioskSheetTd mono">
+                          <a class="kioskEditLink" href="{{ url_for('kiosk_edit', treatment_id=it.treatment_id) }}">
+                            {{ it.menu_name }}
+                          </a>
+                        </td>
                         <td class="kioskSheetTd kioskSheetTd--right mono">{{ "{:,}".format(it.price) }}</td>
                       </tr>
                     {% endfor %}

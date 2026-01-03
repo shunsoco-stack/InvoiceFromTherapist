@@ -188,13 +188,14 @@ def create_app() -> Flask:
         out: Dict[int, List[Dict[str, object]]] = {}
         for d in details:
             tid = int(d["therapist_id"])
+            treatment_id = int(d["treatment_id"])
             name = str(d["menu_name"])
             price = int(d.get("price", 0))
             qty = max(1, int(d.get("quantity", 1)))
             if tid not in out:
                 out[tid] = []
             for _ in range(qty):
-                out[tid].append({"menu_name": name, "price": price})
+                out[tid].append({"treatment_id": treatment_id, "menu_name": name, "price": price})
         return out
 
     def _kiosk_hpb_totals(details: List[Dict[str, object]]) -> Dict[int, int]:
