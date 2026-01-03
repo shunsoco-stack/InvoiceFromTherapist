@@ -220,6 +220,7 @@ input::placeholder{ color: rgba(169,180,202,.7); }
 
 .kioskForm{ display:flex; flex-direction: column; gap: 12px; }
 .kioskRow{ display:flex; flex-direction: column; gap: 8px; }
+.kioskRow--hidden{ display:none; }
 .kioskLabel{ color: var(--muted); font-size: 14px; }
 .kioskSelect{
   font-size: 20px;

@@ -27,7 +27,7 @@
         <form class="kioskForm" method="post" action="{{ url_for('kiosk_new') }}">
           <div class="kioskRow">
             <div class="kioskLabel">1) セラピスト / Therapist / พนักงาน</div>
-            <select class="kioskSelect" name="therapist_id" required>
+            <select id="therapistSelect" class="kioskSelect" name="therapist_id" required>
               <option value="" selected disabled>เลือกพนักงาน / Select</option>
               {% for t in therapists %}
                 <option value="{{ t.id }}">{{ t.name }}</option>
@@ -35,9 +35,9 @@
             </select>
           </div>
 
-          <div class="kioskRow">
+          <div id="menuRow" class="kioskRow kioskRow--hidden">
             <div class="kioskLabel">2) メニュー / Menu（T/60）</div>
-            <select class="kioskSelect" name="menu_id" required>
+            <select id="menuSelect" class="kioskSelect" name="menu_id" required disabled>
               <option value="" selected disabled>เลือกเมนู / Select</option>
               {% for m in menus %}
                 <option value="{{ m.id }}">{{ m.name }}</option>
@@ -45,7 +45,7 @@
             </select>
           </div>
 
-          <div class="kioskRow">
+          <div id="qtyRow" class="kioskRow kioskRow--hidden">
             <div class="kioskLabel">3) 数 / Qty / จำนวน</div>
           <div class="kioskQty">
             <button class="btn btn--secondary kiosk__btn kioskQty__btn" type="button" onclick="decQty()">−</button>
@@ -54,7 +54,7 @@
           </div>
           </div>
 
-          <div class="actions kiosk__actions">
+          <div id="actionsRow" class="actions kiosk__actions kioskRow--hidden">
             <button class="btn kiosk__btn kiosk__btn--primary" type="submit">保存 / Save / บันทึก</button>
             <a class="btn btn--secondary kiosk__btn" href="{{ url_for('report_daily', date=service_date) }}">レポート（管理者）</a>
           </div>
@@ -70,6 +70,34 @@
       </section>
 
       <script>
+        const therapistSelect = document.getElementById('therapistSelect');
+        const menuRow = document.getElementById('menuRow');
+        const menuSelect = document.getElementById('menuSelect');
+        const qtyRow = document.getElementById('qtyRow');
+        const actionsRow = document.getElementById('actionsRow');
+
+        function showMenuStep() {
+          menuRow.classList.remove('kioskRow--hidden');
+          menuSelect.disabled = false;
+        }
+
+        function showQtyAndActions() {
+          qtyRow.classList.remove('kioskRow--hidden');
+          actionsRow.classList.remove('kioskRow--hidden');
+        }
+
+        therapistSelect.addEventListener('change', () => {
+          if (therapistSelect.value) {
+            showMenuStep();
+          }
+        });
+
+        menuSelect.addEventListener('change', () => {
+          if (menuSelect.value) {
+            showQtyAndActions();
+          }
+        });
+
         function incQty() {
           const el = document.getElementById('qty');
           el.value = Math.max(1, (parseInt(el.value || '1', 10) || 1) + 1);
