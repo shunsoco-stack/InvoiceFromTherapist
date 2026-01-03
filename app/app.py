@@ -38,14 +38,14 @@ def create_app() -> Flask:
         try:
             therapists, menus = _load_active_therapists_and_menus(conn)
             summaries, details = _compute_daily_summary(conn, service_date)
-            menu_breakdown = _kiosk_menu_breakdown(details)
+            items_by_therapist = _kiosk_items_by_therapist(details)
             return render_template(
                 "kiosk.html",
                 service_date=service_date,
                 therapists=therapists,
                 menus=menus,
                 summaries=summaries,
-                menu_breakdown=menu_breakdown,
+                items_by_therapist=items_by_therapist,
             )
         finally:
             conn.close()
@@ -78,20 +78,22 @@ def create_app() -> Flask:
         finally:
             conn.close()
 
-    def _kiosk_menu_breakdown(details: List[Dict[str, object]]) -> Dict[int, List[str]]:
+    def _kiosk_items_by_therapist(details: List[Dict[str, object]]) -> Dict[int, List[Dict[str, object]]]:
         """
-        Per-therapist menu list for the day.
+        Per-therapist item list for the day (for kiosk summary sheet).
         - Do NOT compress as "×2" etc.
-        - If quantity > 1 (entered via admin), repeat menu name that many times.
+        - If quantity > 1 (entered via admin), repeat the line that many times.
         """
-        out: Dict[int, List[str]] = {}
+        out: Dict[int, List[Dict[str, object]]] = {}
         for d in details:
             tid = int(d["therapist_id"])
             name = str(d["menu_name"])
+            price = int(d.get("price", 0))
             qty = max(1, int(d.get("quantity", 1)))
             if tid not in out:
                 out[tid] = []
-            out[tid].extend([name] * qty)
+            for _ in range(qty):
+                out[tid].append({"menu_name": name, "price": price})
         return out
 
     # ----------------

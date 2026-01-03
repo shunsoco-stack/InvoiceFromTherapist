@@ -230,36 +230,46 @@ input::placeholder{ color: rgba(169,180,202,.7); }
   background: rgba(0,0,0,.20);
 }
 
-/* Kiosk summary cards (per therapist, vertical) */
-.kioskSummary{ display:flex; flex-direction: column; gap: 12px; }
-.kioskSummaryCard{
+/* Kiosk summary "sheet" (like paper table) */
+.kioskSheets{
+  display:grid;
+  grid-template-columns: 1fr;
+  gap: 12px;
+}
+@media (min-width: 920px){
+  .kioskSheets{ grid-template-columns: 1fr 1fr; }
+}
+.kioskSheet{
+  background: rgba(255,255,255,.96);
   border: 1px solid rgba(241,198,220,.95);
-  background: rgba(255,255,255,.92);
   border-radius: 18px;
-  padding: 12px;
+  overflow:hidden;
   box-shadow: var(--shadow2);
 }
-.kioskSummaryHead{
-  display:flex;
-  gap: 10px;
-  align-items: flex-start;
-  justify-content: space-between;
-  flex-wrap: wrap;
-  margin-bottom: 8px;
+.kioskSheetTable{
+  width:100%;
+  border-collapse: collapse;
+  table-layout: fixed;
 }
-.kioskSummaryName{ font-weight: 900; font-size: 18px; }
-.kioskSummaryTotals{ display:flex; gap: 12px; flex-wrap: wrap; }
-.kioskSummaryTotalItem{ display:flex; gap: 8px; align-items: baseline; }
-.kioskSummaryMenus{ margin-top: 6px; }
-.kioskMenuList{
-  margin: 0;
-  padding-left: 18px;
-  display:grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 6px 12px;
+.kioskSheetTh{
+  padding: 10px 10px;
+  font-weight: 800;
+  background: rgba(255,240,247,.95);
+  border-bottom: 1px solid rgba(241,198,220,.95);
+  border-right: 1px solid rgba(241,198,220,.55);
+  text-align:left;
 }
-@media (min-width: 860px){
-  .kioskMenuList{ grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.kioskSheetTh--right{ text-align:right; }
+.kioskSheetTd{
+  padding: 9px 10px;
+  border-bottom: 1px solid rgba(241,198,220,.55);
+  border-right: 1px solid rgba(241,198,220,.55);
+  vertical-align: top;
+}
+.kioskSheetTd--right{ text-align:right; }
+.kioskSheetTable tr > *:last-child{ border-right: none; }
+.kioskSheetTable tfoot .kioskSheetTd{
+  background: rgba(255,255,255,.98);
 }
 
 .pickGrid{
