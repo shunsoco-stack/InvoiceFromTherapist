@@ -140,6 +140,20 @@ input::placeholder{ color: rgba(169,180,202,.7); }
 
 .list{ margin: 8px 0 0 18px; color: var(--muted); }
 
+/* Home (super simple) */
+.homeSimple{
+  min-height: calc(100vh - 140px);
+  display:flex;
+  flex-direction: column;
+  align-items:center;
+  justify-content:center;
+  gap: 14px;
+  padding: 12px 0 24px;
+}
+.homeSimple__title{ color: var(--muted); font-size: 16px; }
+.homeSimple__buttons{ display:flex; gap: 14px; flex-wrap: wrap; justify-content:center; }
+.homeSimple__btn{ font-size: 22px; padding: 16px 18px; border-radius: 16px; min-width: 200px; }
+
 /* Kiosk / Simple input (touch friendly) */
 .kiosk{ max-width: 980px; margin: 0 auto; }
 .kiosk__head{ margin: 6px 0 10px; }

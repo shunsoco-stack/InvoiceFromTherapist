@@ -22,6 +22,11 @@ def create_app() -> Flask:
         today = date.today().isoformat()
         return render_template("index.html", today=today)
 
+    @app.get("/admin")
+    def admin():
+        today = date.today().isoformat()
+        return render_template("admin.html", today=today)
+
     # ----------------
     # Kiosk (simple input for therapists)
     # ----------------
