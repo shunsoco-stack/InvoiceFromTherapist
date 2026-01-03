@@ -138,6 +138,49 @@
         {% endif %}
       </section>
 
+      <section id="history" class="card kiosk__card">
+        <h2>今日の履歴（修正/削除）</h2>
+        <p class="muted">入力ミスを直したい時はここからできます（今日分のみ）。</p>
+        <div class="table-wrap">
+          <table class="table">
+            <thead>
+              <tr>
+                <th>ID</th>
+                <th>セラピスト</th>
+                <th>メニュー</th>
+                <th class="right">HPB</th>
+                <th class="right">P</th>
+                <th class="right">R</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for r in recent %}
+                <tr>
+                  <td class="mono">{{ r.id }}</td>
+                  <td>{{ r.therapist_name }}</td>
+                  <td class="mono">{{ r.menu_name }}</td>
+                  <td class="right mono">{{ r.hpb }}</td>
+                  <td class="right mono">{{ r.p }}</td>
+                  <td class="right mono">{{ r.r }}</td>
+                  <td class="right">
+                    <div class="actions" style="justify-content:flex-end; margin:0;">
+                      <a class="btn btn--secondary kioskSmallBtn" href="{{ url_for('kiosk_edit', treatment_id=r.id) }}">修正</a>
+                      <form method="post" action="{{ url_for('kiosk_delete', treatment_id=r.id) }}" onsubmit="return confirm('削除しますか？');">
+                        <button class="btn btn--danger kioskSmallBtn" type="submit">削除</button>
+                      </form>
+                    </div>
+                  </td>
+                </tr>
+              {% endfor %}
+              {% if recent|length == 0 %}
+                <tr><td colspan="7" class="muted">まだ入力がありません。</td></tr>
+              {% endif %}
+            </tbody>
+          </table>
+        </div>
+      </section>
+
       <section class="card kiosk__card">
         <h2>ヘルプ / Help</h2>
         <ul class="list">

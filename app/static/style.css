@@ -254,6 +254,11 @@ input::placeholder{ color: rgba(169,180,202,.7); }
   padding: 12px 12px;
   width: 140px;
 }
+.kioskSmallBtn{
+  font-size: 14px;
+  padding: 8px 10px;
+  border-radius: 14px;
+}
 
 /* Kiosk summary "sheet" (like paper table) */
 .kioskSheets{

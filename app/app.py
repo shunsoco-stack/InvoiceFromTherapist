@@ -42,6 +42,7 @@ def create_app() -> Flask:
             hpb_totals = _kiosk_hpb_totals(details)
             p_totals = _kiosk_p_totals(details)
             r_totals = _kiosk_r_totals(details)
+            recent = _kiosk_recent_treatments(conn, service_date)
             return render_template(
                 "kiosk.html",
                 service_date=service_date,
@@ -52,6 +53,7 @@ def create_app() -> Flask:
                 hpb_totals=hpb_totals,
                 p_totals=p_totals,
                 r_totals=r_totals,
+                recent=recent,
             )
         finally:
             conn.close()
@@ -96,6 +98,87 @@ def create_app() -> Flask:
         finally:
             conn.close()
 
+    @app.get("/kiosk/<int:treatment_id>/edit")
+    def kiosk_edit(treatment_id: int):
+        today = date.today().isoformat()
+        conn = connect()
+        try:
+            t = q1(
+                conn,
+                """
+                SELECT t.*, th.name AS therapist_name, m.name AS menu_name
+                FROM treatments t
+                JOIN therapists th ON th.id = t.therapist_id
+                JOIN menus m ON m.id = t.menu_id
+                WHERE t.id = ?
+                """,
+                (treatment_id,),
+            )
+            if not t or str(t["service_date"]) != today:
+                flash("今日の入力のみ修正できます。", "error")
+                return redirect(url_for("kiosk", _anchor="history"))
+
+            therapists, menus = _load_active_therapists_and_menus(conn)
+            return render_template("kiosk_edit.html", service_date=today, treatment=t, therapists=therapists, menus=menus)
+        finally:
+            conn.close()
+
+    @app.post("/kiosk/<int:treatment_id>/edit")
+    def kiosk_edit_post(treatment_id: int):
+        today = date.today().isoformat()
+        therapist_id = int(request.form.get("therapist_id") or "0")
+        menu_id = int(request.form.get("menu_id") or "0")
+        hpb = int(request.form.get("hpb") or "0")
+        p = int(request.form.get("p") or "0")
+        r = int(request.form.get("r") or "0")
+
+        if therapist_id <= 0 or menu_id <= 0:
+            flash("Please select therapist and menu / กรุณาเลือกพนักงานและเมนู", "error")
+            return redirect(url_for("kiosk_edit", treatment_id=treatment_id))
+        if hpb < 0 or p < 0:
+            flash("HPB/P must be 0+ / HPB/P ต้องมากกว่าหรือเท่ากับ 0", "error")
+            return redirect(url_for("kiosk_edit", treatment_id=treatment_id))
+        if r not in (500, 1000):
+            flash("R must be 500 or 1000 / R ต้องเป็น 500 หรือ 1000", "error")
+            return redirect(url_for("kiosk_edit", treatment_id=treatment_id))
+
+        conn = connect()
+        try:
+            row = q1(conn, "SELECT * FROM treatments WHERE id = ?", (treatment_id,))
+            if not row or str(row["service_date"]) != today:
+                flash("今日の入力のみ修正できます。", "error")
+                return redirect(url_for("kiosk", _anchor="history"))
+
+            conn.execute(
+                """
+                UPDATE treatments
+                SET therapist_id = ?, menu_id = ?, hpb = ?, p = ?, r = ?
+                WHERE id = ?
+                """,
+                (therapist_id, menu_id, hpb, p, r, treatment_id),
+            )
+            conn.commit()
+            flash("Updated / แก้ไขแล้ว", "ok")
+            return redirect(url_for("kiosk", _anchor="history"))
+        finally:
+            conn.close()
+
+    @app.post("/kiosk/<int:treatment_id>/delete")
+    def kiosk_delete(treatment_id: int):
+        today = date.today().isoformat()
+        conn = connect()
+        try:
+            row = q1(conn, "SELECT * FROM treatments WHERE id = ?", (treatment_id,))
+            if not row or str(row["service_date"]) != today:
+                flash("今日の入力のみ削除できます。", "error")
+                return redirect(url_for("kiosk", _anchor="history"))
+            conn.execute("DELETE FROM treatments WHERE id = ?", (treatment_id,))
+            conn.commit()
+            flash("Deleted / ลบแล้ว", "ok")
+            return redirect(url_for("kiosk", _anchor="history"))
+        finally:
+            conn.close()
+
     def _kiosk_items_by_therapist(details: List[Dict[str, object]]) -> Dict[int, List[Dict[str, object]]]:
         """
         Per-therapist item list for the day (for kiosk summary sheet).
@@ -134,6 +217,21 @@ def create_app() -> Flask:
             tid = int(d["therapist_id"])
             totals[tid] = int(totals.get(tid, 0)) + int(d.get("r", 0))
         return totals
+
+    def _kiosk_recent_treatments(conn, service_date: str):
+        return q(
+            conn,
+            """
+            SELECT t.id, t.created_at, t.hpb, t.p, t.r, th.name AS therapist_name, m.name AS menu_name
+            FROM treatments t
+            JOIN therapists th ON th.id = t.therapist_id
+            JOIN menus m ON m.id = t.menu_id
+            WHERE t.service_date = ?
+            ORDER BY t.id DESC
+            LIMIT 30
+            """,
+            (service_date,),
+        )
 
     # ----------------
     # Therapists
