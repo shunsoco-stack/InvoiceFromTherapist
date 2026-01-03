@@ -1,0 +1,463 @@
+import csv
+import io
+from datetime import date, datetime
+from typing import Dict, List, Optional, Tuple
+
+from flask import Flask, Response, flash, redirect, render_template, request, url_for
+
+from app.calc import calc_payout_yen, pick_commission_rule
+from app.db import connect, exec1, init_db, now_iso, q, q1
+
+
+def create_app() -> Flask:
+    app = Flask(__name__)
+    app.secret_key = "dev-secret-key"  # ローカル運用想定。必要なら環境変数化してください。
+
+    init_db()
+
+    @app.get("/")
+    def index():
+        today = date.today().isoformat()
+        return render_template("index.html", today=today)
+
+    # ----------------
+    # Therapists
+    # ----------------
+    @app.get("/therapists")
+    def therapists_list():
+        conn = connect()
+        try:
+            rows = q(
+                conn,
+                "SELECT * FROM therapists ORDER BY is_active DESC, name ASC, id ASC",
+            )
+            return render_template("therapists_list.html", therapists=rows)
+        finally:
+            conn.close()
+
+    @app.post("/therapists/new")
+    def therapists_new():
+        name = (request.form.get("name") or "").strip()
+        commission_type = (request.form.get("commission_type") or "percent").strip()
+        commission_value = int(request.form.get("commission_value") or "50")
+        is_active = 1 if (request.form.get("is_active") == "on") else 0
+        if not name:
+            flash("名前は必須です。", "error")
+            return redirect(url_for("therapists_list"))
+        if commission_type not in ("percent", "fixed"):
+            flash("歩合タイプが不正です。", "error")
+            return redirect(url_for("therapists_list"))
+        conn = connect()
+        try:
+            exec1(
+                conn,
+                """
+                INSERT INTO therapists(name, commission_type, commission_value, is_active, created_at)
+                VALUES (?, ?, ?, ?, ?)
+                """,
+                (name, commission_type, commission_value, is_active, now_iso()),
+            )
+            flash("セラピストを追加しました。", "ok")
+            return redirect(url_for("therapists_list"))
+        finally:
+            conn.close()
+
+    @app.post("/therapists/<int:therapist_id>/toggle")
+    def therapists_toggle(therapist_id: int):
+        conn = connect()
+        try:
+            t = q1(conn, "SELECT * FROM therapists WHERE id = ?", (therapist_id,))
+            if not t:
+                flash("対象のセラピストが見つかりません。", "error")
+                return redirect(url_for("therapists_list"))
+            new_val = 0 if int(t["is_active"]) == 1 else 1
+            conn.execute("UPDATE therapists SET is_active = ? WHERE id = ?", (new_val, therapist_id))
+            conn.commit()
+            flash("ステータスを更新しました。", "ok")
+            return redirect(url_for("therapists_list"))
+        finally:
+            conn.close()
+
+    # ----------------
+    # Menus
+    # ----------------
+    @app.get("/menus")
+    def menus_list():
+        conn = connect()
+        try:
+            rows = q(conn, "SELECT * FROM menus ORDER BY is_active DESC, name ASC, id ASC")
+            return render_template("menus_list.html", menus=rows)
+        finally:
+            conn.close()
+
+    @app.post("/menus/new")
+    def menus_new():
+        name = (request.form.get("name") or "").strip()
+        price = int(request.form.get("price") or "0")
+        is_active = 1 if (request.form.get("is_active") == "on") else 0
+
+        commission_type = (request.form.get("commission_type") or "").strip() or None
+        commission_value_raw = (request.form.get("commission_value") or "").strip()
+        commission_value = int(commission_value_raw) if commission_value_raw else None
+
+        if not name:
+            flash("メニュー名は必須です。", "error")
+            return redirect(url_for("menus_list"))
+        if price < 0:
+            flash("金額が不正です。", "error")
+            return redirect(url_for("menus_list"))
+        if commission_type is not None and commission_type not in ("percent", "fixed"):
+            flash("歩合タイプが不正です。", "error")
+            return redirect(url_for("menus_list"))
+
+        conn = connect()
+        try:
+            exec1(
+                conn,
+                """
+                INSERT INTO menus(name, price, commission_type, commission_value, is_active, created_at)
+                VALUES (?, ?, ?, ?, ?, ?)
+                """,
+                (name, price, commission_type, commission_value, is_active, now_iso()),
+            )
+            flash("メニューを追加しました。", "ok")
+            return redirect(url_for("menus_list"))
+        finally:
+            conn.close()
+
+    @app.post("/menus/<int:menu_id>/toggle")
+    def menus_toggle(menu_id: int):
+        conn = connect()
+        try:
+            m = q1(conn, "SELECT * FROM menus WHERE id = ?", (menu_id,))
+            if not m:
+                flash("対象のメニューが見つかりません。", "error")
+                return redirect(url_for("menus_list"))
+            new_val = 0 if int(m["is_active"]) == 1 else 1
+            conn.execute("UPDATE menus SET is_active = ? WHERE id = ?", (new_val, menu_id))
+            conn.commit()
+            flash("ステータスを更新しました。", "ok")
+            return redirect(url_for("menus_list"))
+        finally:
+            conn.close()
+
+    # ----------------
+    # Treatments
+    # ----------------
+    def _load_active_therapists_and_menus(conn):
+        therapists = q(conn, "SELECT * FROM therapists WHERE is_active = 1 ORDER BY name ASC, id ASC")
+        menus = q(conn, "SELECT * FROM menus WHERE is_active = 1 ORDER BY name ASC, id ASC")
+        return therapists, menus
+
+    @app.get("/treatments")
+    def treatments_list():
+        service_date = (request.args.get("date") or date.today().isoformat()).strip()
+        conn = connect()
+        try:
+            therapists, menus = _load_active_therapists_and_menus(conn)
+            rows = q(
+                conn,
+                """
+                SELECT t.*, th.name AS therapist_name, m.name AS menu_name, m.price AS menu_price
+                FROM treatments t
+                JOIN therapists th ON th.id = t.therapist_id
+                JOIN menus m ON m.id = t.menu_id
+                WHERE t.service_date = ?
+                ORDER BY t.id DESC
+                """,
+                (service_date,),
+            )
+            return render_template(
+                "treatments_list.html",
+                service_date=service_date,
+                therapists=therapists,
+                menus=menus,
+                treatments=rows,
+            )
+        finally:
+            conn.close()
+
+    @app.post("/treatments/new")
+    def treatments_new():
+        service_date = (request.form.get("service_date") or date.today().isoformat()).strip()
+        therapist_id = int(request.form.get("therapist_id") or "0")
+        menu_id = int(request.form.get("menu_id") or "0")
+        quantity = int(request.form.get("quantity") or "1")
+        notes = (request.form.get("notes") or "").strip() or None
+
+        price_override_raw = (request.form.get("price_override") or "").strip()
+        price_override = int(price_override_raw) if price_override_raw else None
+
+        commission_type_override = (request.form.get("commission_type_override") or "").strip() or None
+        commission_value_override_raw = (request.form.get("commission_value_override") or "").strip()
+        commission_value_override = int(commission_value_override_raw) if commission_value_override_raw else None
+
+        if therapist_id <= 0 or menu_id <= 0:
+            flash("セラピストとメニューを選択してください。", "error")
+            return redirect(url_for("treatments_list", date=service_date))
+        if quantity <= 0:
+            flash("数量が不正です。", "error")
+            return redirect(url_for("treatments_list", date=service_date))
+        if commission_type_override is not None and commission_type_override not in ("percent", "fixed"):
+            flash("歩合(上書き)のタイプが不正です。", "error")
+            return redirect(url_for("treatments_list", date=service_date))
+
+        conn = connect()
+        try:
+            exec1(
+                conn,
+                """
+                INSERT INTO treatments(
+                  service_date, therapist_id, menu_id, quantity,
+                  price_override, commission_type_override, commission_value_override,
+                  notes, created_at
+                )
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    service_date,
+                    therapist_id,
+                    menu_id,
+                    quantity,
+                    price_override,
+                    commission_type_override,
+                    commission_value_override,
+                    notes,
+                    now_iso(),
+                ),
+            )
+            flash("施術を記録しました。", "ok")
+            return redirect(url_for("treatments_list", date=service_date))
+        finally:
+            conn.close()
+
+    @app.post("/treatments/<int:treatment_id>/delete")
+    def treatments_delete(treatment_id: int):
+        service_date = (request.form.get("service_date") or date.today().isoformat()).strip()
+        conn = connect()
+        try:
+            conn.execute("DELETE FROM treatments WHERE id = ?", (treatment_id,))
+            conn.commit()
+            flash("削除しました。", "ok")
+            return redirect(url_for("treatments_list", date=service_date))
+        finally:
+            conn.close()
+
+    # ----------------
+    # Reports / Payouts
+    # ----------------
+    def _daily_report_rows(conn, service_date: str):
+        rows = q(
+            conn,
+            """
+            SELECT
+              t.id,
+              t.service_date,
+              t.quantity,
+              t.price_override,
+              t.commission_type_override,
+              t.commission_value_override,
+              t.notes,
+              th.id AS therapist_id,
+              th.name AS therapist_name,
+              th.commission_type AS therapist_commission_type,
+              th.commission_value AS therapist_commission_value,
+              m.id AS menu_id,
+              m.name AS menu_name,
+              m.price AS menu_price,
+              m.commission_type AS menu_commission_type,
+              m.commission_value AS menu_commission_value
+            FROM treatments t
+            JOIN therapists th ON th.id = t.therapist_id
+            JOIN menus m ON m.id = t.menu_id
+            WHERE t.service_date = ?
+            ORDER BY th.name ASC, t.id ASC
+            """,
+            (service_date,),
+        )
+        return rows
+
+    def _compute_daily_summary(conn, service_date: str):
+        rows = _daily_report_rows(conn, service_date)
+        per_therapist: Dict[int, Dict[str, object]] = {}
+        detail_lines: List[Dict[str, object]] = []
+
+        for r in rows:
+            price = int(r["price_override"]) if r["price_override"] is not None else int(r["menu_price"])
+            rule = pick_commission_rule(
+                r["commission_type_override"],
+                r["commission_value_override"],
+                r["menu_commission_type"],
+                r["menu_commission_value"],
+                r["therapist_commission_type"],
+                r["therapist_commission_value"],
+            )
+            sales, payout = calc_payout_yen(price, int(r["quantity"]), rule)
+
+            detail_lines.append(
+                {
+                    "treatment_id": r["id"],
+                    "therapist_id": r["therapist_id"],
+                    "therapist_name": r["therapist_name"],
+                    "menu_name": r["menu_name"],
+                    "quantity": int(r["quantity"]),
+                    "price": price,
+                    "sales": sales,
+                    "rule_type": rule.commission_type,
+                    "rule_value": rule.commission_value,
+                    "payout": payout,
+                    "notes": r["notes"] or "",
+                }
+            )
+
+            tid = int(r["therapist_id"])
+            if tid not in per_therapist:
+                per_therapist[tid] = {
+                    "therapist_id": tid,
+                    "therapist_name": r["therapist_name"],
+                    "sales_total": 0,
+                    "payout_total": 0,
+                }
+            per_therapist[tid]["sales_total"] = int(per_therapist[tid]["sales_total"]) + sales
+            per_therapist[tid]["payout_total"] = int(per_therapist[tid]["payout_total"]) + payout
+
+        payout_rows = q(
+            conn,
+            "SELECT * FROM payouts WHERE service_date = ?",
+            (service_date,),
+        )
+        paid_map = {int(p["therapist_id"]): p for p in payout_rows}
+        for tid, s in per_therapist.items():
+            s["paid"] = tid in paid_map
+            s["paid_amount"] = int(paid_map[tid]["paid_amount"]) if tid in paid_map else 0
+            s["paid_at"] = paid_map[tid]["paid_at"] if tid in paid_map else None
+            s["paid_method"] = paid_map[tid]["method"] if tid in paid_map else None
+
+        summaries = sorted(per_therapist.values(), key=lambda x: (str(x["therapist_name"]), int(x["therapist_id"])))
+        return summaries, detail_lines
+
+    @app.get("/reports/daily")
+    def report_daily():
+        service_date = (request.args.get("date") or date.today().isoformat()).strip()
+        conn = connect()
+        try:
+            summaries, details = _compute_daily_summary(conn, service_date)
+            return render_template(
+                "report_daily.html",
+                service_date=service_date,
+                summaries=summaries,
+                details=details,
+            )
+        finally:
+            conn.close()
+
+    @app.get("/reports/daily.csv")
+    def report_daily_csv():
+        service_date = (request.args.get("date") or date.today().isoformat()).strip()
+        conn = connect()
+        try:
+            summaries, details = _compute_daily_summary(conn, service_date)
+            output = io.StringIO()
+            w = csv.writer(output)
+
+            w.writerow(["日付", service_date])
+            w.writerow([])
+            w.writerow(["セラピスト別集計"])
+            w.writerow(["セラピスト", "売上合計(円)", "支払合計(円)", "支払済み", "支払額(円)", "支払日時", "支払方法"])
+            for s in summaries:
+                w.writerow(
+                    [
+                        s["therapist_name"],
+                        s["sales_total"],
+                        s["payout_total"],
+                        "済" if s["paid"] else "未",
+                        s["paid_amount"],
+                        s["paid_at"] or "",
+                        s["paid_method"] or "",
+                    ]
+                )
+
+            w.writerow([])
+            w.writerow(["明細"])
+            w.writerow(["施術ID", "セラピスト", "メニュー", "数量", "単価(円)", "売上(円)", "歩合タイプ", "歩合値", "支払(円)", "メモ"])
+            for d in details:
+                w.writerow(
+                    [
+                        d["treatment_id"],
+                        d["therapist_name"],
+                        d["menu_name"],
+                        d["quantity"],
+                        d["price"],
+                        d["sales"],
+                        d["rule_type"],
+                        d["rule_value"],
+                        d["payout"],
+                        d["notes"],
+                    ]
+                )
+
+            bom = "\ufeff"
+            csv_bytes = (bom + output.getvalue()).encode("utf-8")
+            filename = f"daily_{service_date}.csv"
+            return Response(
+                csv_bytes,
+                mimetype="text/csv; charset=utf-8",
+                headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+            )
+        finally:
+            conn.close()
+
+    @app.post("/payouts/mark_paid")
+    def payout_mark_paid():
+        service_date = (request.form.get("service_date") or date.today().isoformat()).strip()
+        therapist_id = int(request.form.get("therapist_id") or "0")
+        method = (request.form.get("method") or "").strip() or None
+        notes = (request.form.get("notes") or "").strip() or None
+
+        conn = connect()
+        try:
+            summaries, _ = _compute_daily_summary(conn, service_date)
+            target = next((s for s in summaries if int(s["therapist_id"]) == therapist_id), None)
+            if not target:
+                flash("対象のセラピストの集計が見つかりません（施術が未入力かもしれません）。", "error")
+                return redirect(url_for("report_daily", date=service_date))
+
+            paid_amount = int(target["payout_total"])
+            now = datetime.now().replace(microsecond=0).isoformat()
+            conn.execute(
+                """
+                INSERT INTO payouts(service_date, therapist_id, paid_amount, paid_at, method, notes)
+                VALUES (?, ?, ?, ?, ?, ?)
+                ON CONFLICT(service_date, therapist_id)
+                DO UPDATE SET paid_amount=excluded.paid_amount, paid_at=excluded.paid_at, method=excluded.method, notes=excluded.notes
+                """,
+                (service_date, therapist_id, paid_amount, now, method, notes),
+            )
+            conn.commit()
+            flash("支払い済みにしました。", "ok")
+            return redirect(url_for("report_daily", date=service_date))
+        finally:
+            conn.close()
+
+    @app.post("/payouts/unmark_paid")
+    def payout_unmark_paid():
+        service_date = (request.form.get("service_date") or date.today().isoformat()).strip()
+        therapist_id = int(request.form.get("therapist_id") or "0")
+        conn = connect()
+        try:
+            conn.execute("DELETE FROM payouts WHERE service_date = ? AND therapist_id = ?", (service_date, therapist_id))
+            conn.commit()
+            flash("支払い記録を取り消しました。", "ok")
+            return redirect(url_for("report_daily", date=service_date))
+        finally:
+            conn.close()
+
+    return app
+
+
+app = create_app()
+
+
+if __name__ == "__main__":
+    app.run(host="0.0.0.0", port=5000, debug=True)
+
