@@ -1,0 +1,87 @@
+{% extends "base.html" %}
+{% set title = "セラピスト" %}
+{% block content %}
+  <div class="page-head">
+    <h1>セラピスト</h1>
+    <p class="muted">日払い計算の基準（歩合% または 固定額）を登録します。</p>
+  </div>
+
+  <section class="card">
+    <h2>追加</h2>
+    <form class="form" method="post" action="{{ url_for('therapists_new') }}">
+      <div class="form-row">
+        <label>名前</label>
+        <input name="name" placeholder="例）佐藤" required />
+      </div>
+      <div class="form-row">
+        <label>歩合タイプ</label>
+        <select name="commission_type">
+          <option value="percent" selected>％（売上×%）</option>
+          <option value="fixed">固定（1件あたり円）</option>
+        </select>
+      </div>
+      <div class="form-row">
+        <label>歩合値</label>
+        <input name="commission_value" type="number" inputmode="numeric" value="50" />
+        <div class="help muted">％の場合は 0-100。固定の場合は 1件あたりの支払額（円）。</div>
+      </div>
+      <div class="form-row">
+        <label>有効</label>
+        <label class="checkbox"><input type="checkbox" name="is_active" checked /> 入力に出す</label>
+      </div>
+      <div class="actions">
+        <button class="btn" type="submit">追加</button>
+      </div>
+    </form>
+  </section>
+
+  <section class="card">
+    <h2>一覧</h2>
+    <div class="table-wrap">
+      <table class="table">
+        <thead>
+          <tr>
+            <th>ID</th>
+            <th>名前</th>
+            <th>歩合</th>
+            <th>状態</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for t in therapists %}
+            <tr>
+              <td class="mono">{{ t.id }}</td>
+              <td>{{ t.name }}</td>
+              <td class="mono">
+                {% if t.commission_type == "percent" %}
+                  {{ t.commission_value }}%
+                {% else %}
+                  固定 {{ t.commission_value }}円/件
+                {% endif %}
+              </td>
+              <td>
+                {% if t.is_active %}
+                  <span class="pill pill--ok">有効</span>
+                {% else %}
+                  <span class="pill">無効</span>
+                {% endif %}
+              </td>
+              <td class="right">
+                <form method="post" action="{{ url_for('therapists_toggle', therapist_id=t.id) }}">
+                  <button class="btn btn--secondary" type="submit">
+                    {% if t.is_active %}無効にする{% else %}有効にする{% endif %}
+                  </button>
+                </form>
+              </td>
+            </tr>
+          {% endfor %}
+          {% if therapists|length == 0 %}
+            <tr><td colspan="5" class="muted">まだ登録がありません。</td></tr>
+          {% endif %}
+        </tbody>
+      </table>
+    </div>
+  </section>
+{% endblock %}
+

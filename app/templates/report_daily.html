@@ -1,0 +1,117 @@
+{% extends "base.html" %}
+{% set title = "日次レポート" %}
+{% block content %}
+  <div class="page-head">
+    <h1>日次レポート</h1>
+    <p class="muted">セラピスト別に「売上合計」と「支払合計（日払い）」を自動計算します。</p>
+  </div>
+
+  <section class="card">
+    <h2>日付</h2>
+    <form class="inline" method="get" action="{{ url_for('report_daily') }}">
+      <input name="date" type="date" value="{{ service_date }}" />
+      <button class="btn btn--secondary" type="submit">表示</button>
+      <a class="btn btn--secondary" href="{{ url_for('treatments_list', date=service_date) }}">この日の施術入力</a>
+      <a class="btn" href="{{ url_for('report_daily_csv', date=service_date) }}">CSV出力</a>
+    </form>
+  </section>
+
+  <section class="card">
+    <h2>セラピスト別集計（{{ service_date }}）</h2>
+    <div class="table-wrap">
+      <table class="table">
+        <thead>
+          <tr>
+            <th>セラピスト</th>
+            <th class="right">売上合計</th>
+            <th class="right">支払合計</th>
+            <th>支払状況</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for s in summaries %}
+            <tr>
+              <td>{{ s.therapist_name }}</td>
+              <td class="right mono">{{ "{:,}".format(s.sales_total) }}円</td>
+              <td class="right mono strong">{{ "{:,}".format(s.payout_total) }}円</td>
+              <td>
+                {% if s.paid %}
+                  <span class="pill pill--ok">支払済</span>
+                  <span class="muted small">{{ s.paid_at }}{% if s.paid_method %}（{{ s.paid_method }}）{% endif %}</span>
+                {% else %}
+                  <span class="pill">未</span>
+                {% endif %}
+              </td>
+              <td class="right">
+                {% if s.paid %}
+                  <form method="post" action="{{ url_for('payout_unmark_paid') }}">
+                    <input type="hidden" name="service_date" value="{{ service_date }}" />
+                    <input type="hidden" name="therapist_id" value="{{ s.therapist_id }}" />
+                    <button class="btn btn--secondary" type="submit">支払取消</button>
+                  </form>
+                {% else %}
+                  <form class="inline" method="post" action="{{ url_for('payout_mark_paid') }}">
+                    <input type="hidden" name="service_date" value="{{ service_date }}" />
+                    <input type="hidden" name="therapist_id" value="{{ s.therapist_id }}" />
+                    <input name="method" placeholder="方法（例：現金）" />
+                    <button class="btn" type="submit">支払済にする</button>
+                  </form>
+                {% endif %}
+              </td>
+            </tr>
+          {% endfor %}
+          {% if summaries|length == 0 %}
+            <tr><td colspan="5" class="muted">この日の施術記録がありません。</td></tr>
+          {% endif %}
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <section class="card">
+    <h2>明細</h2>
+    <div class="table-wrap">
+      <table class="table table--small">
+        <thead>
+          <tr>
+            <th>ID</th>
+            <th>セラピスト</th>
+            <th>メニュー</th>
+            <th class="right">数量</th>
+            <th class="right">単価</th>
+            <th class="right">売上</th>
+            <th class="right">支払</th>
+            <th>歩合</th>
+            <th>メモ</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for d in details %}
+            <tr>
+              <td class="mono">{{ d.treatment_id }}</td>
+              <td>{{ d.therapist_name }}</td>
+              <td>{{ d.menu_name }}</td>
+              <td class="right mono">{{ d.quantity }}</td>
+              <td class="right mono">{{ "{:,}".format(d.price) }}円</td>
+              <td class="right mono">{{ "{:,}".format(d.sales) }}円</td>
+              <td class="right mono strong">{{ "{:,}".format(d.payout) }}円</td>
+              <td class="mono">
+                {% if d.rule_type == "percent" %}
+                  {{ d.rule_value }}%
+                {% else %}
+                  固定 {{ d.rule_value }}円/件
+                {% endif %}
+              </td>
+              <td class="muted">{{ d.notes }}</td>
+            </tr>
+          {% endfor %}
+          {% if details|length == 0 %}
+            <tr><td colspan="9" class="muted">明細がありません。</td></tr>
+          {% endif %}
+        </tbody>
+      </table>
+    </div>
+  </section>
+{% endblock %}
+

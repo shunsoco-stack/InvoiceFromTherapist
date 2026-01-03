@@ -3,6 +3,8 @@ import io
 from datetime import date, datetime
 from typing import Dict, List, Optional, Tuple
 
+import os
+
 from flask import Flask, Response, flash, redirect, render_template, request, url_for
 
 from app.calc import calc_payout_yen, pick_commission_rule
@@ -11,7 +13,7 @@ from app.db import connect, exec1, init_db, now_iso, q, q1
 
 def create_app() -> Flask:
     app = Flask(__name__)
-    app.secret_key = "dev-secret-key"  # ローカル運用想定。必要なら環境変数化してください。
+    app.secret_key = os.getenv("SALON_SECRET_KEY", "dev-secret-key")  # ローカル運用想定
 
     init_db()
 
