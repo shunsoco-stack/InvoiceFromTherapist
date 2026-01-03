@@ -39,6 +39,7 @@ def create_app() -> Flask:
             therapists, menus = _load_active_therapists_and_menus(conn)
             summaries, details = _compute_daily_summary(conn, service_date)
             items_by_therapist = _kiosk_items_by_therapist(details)
+            hpb_totals = _kiosk_hpb_totals(details)
             return render_template(
                 "kiosk.html",
                 service_date=service_date,
@@ -46,6 +47,7 @@ def create_app() -> Flask:
                 menus=menus,
                 summaries=summaries,
                 items_by_therapist=items_by_therapist,
+                hpb_totals=hpb_totals,
             )
         finally:
             conn.close()
@@ -56,11 +58,15 @@ def create_app() -> Flask:
         service_date = date.today().isoformat()
         therapist_id = int(request.form.get("therapist_id") or "0")
         menu_id = int(request.form.get("menu_id") or "0")
+        hpb = int(request.form.get("hpb") or "0")
         # シンプル運用: 1回の保存=1件として固定
         quantity = 1
 
         if therapist_id <= 0 or menu_id <= 0:
             flash("Please select therapist and menu / กรุณาเลือกพนักงานและเมนู", "error")
+            return redirect(url_for("kiosk", date=service_date))
+        if hpb < 0:
+            flash("HPB must be 0+ / HPB ต้องมากกว่าหรือเท่ากับ 0", "error")
             return redirect(url_for("kiosk", date=service_date))
 
         conn = connect()
@@ -68,10 +74,10 @@ def create_app() -> Flask:
             exec1(
                 conn,
                 """
-                INSERT INTO treatments(service_date, therapist_id, menu_id, quantity, notes, created_at)
-                VALUES (?, ?, ?, ?, NULL, ?)
+                INSERT INTO treatments(service_date, therapist_id, menu_id, quantity, hpb, notes, created_at)
+                VALUES (?, ?, ?, ?, ?, NULL, ?)
                 """,
-                (service_date, therapist_id, menu_id, quantity, now_iso()),
+                (service_date, therapist_id, menu_id, quantity, hpb, now_iso()),
             )
             flash("Saved / บันทึกแล้ว", "ok")
             return redirect(url_for("kiosk", _anchor="summary"))
@@ -95,6 +101,13 @@ def create_app() -> Flask:
             for _ in range(qty):
                 out[tid].append({"menu_name": name, "price": price})
         return out
+
+    def _kiosk_hpb_totals(details: List[Dict[str, object]]) -> Dict[int, int]:
+        totals: Dict[int, int] = {}
+        for d in details:
+            tid = int(d["therapist_id"])
+            totals[tid] = int(totals.get(tid, 0)) + int(d.get("hpb", 0))
+        return totals
 
     # ----------------
     # Therapists
@@ -260,6 +273,7 @@ def create_app() -> Flask:
         menu_id = int(request.form.get("menu_id") or "0")
         quantity = int(request.form.get("quantity") or "1")
         notes = (request.form.get("notes") or "").strip() or None
+        hpb = int(request.form.get("hpb") or "0")
 
         price_override_raw = (request.form.get("price_override") or "").strip()
         price_override = int(price_override_raw) if price_override_raw else None
@@ -274,6 +288,9 @@ def create_app() -> Flask:
         if quantity <= 0:
             flash("数量が不正です。", "error")
             return redirect(url_for("treatments_list", date=service_date))
+        if hpb < 0:
+            flash("HPBが不正です。", "error")
+            return redirect(url_for("treatments_list", date=service_date))
         if commission_type_override is not None and commission_type_override not in ("percent", "fixed"):
             flash("歩合(上書き)のタイプが不正です。", "error")
             return redirect(url_for("treatments_list", date=service_date))
@@ -284,17 +301,18 @@ def create_app() -> Flask:
                 conn,
                 """
                 INSERT INTO treatments(
-                  service_date, therapist_id, menu_id, quantity,
+                  service_date, therapist_id, menu_id, quantity, hpb,
                   price_override, commission_type_override, commission_value_override,
                   notes, created_at
                 )
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 (
                     service_date,
                     therapist_id,
                     menu_id,
                     quantity,
+                    hpb,
                     price_override,
                     commission_type_override,
                     commission_value_override,
@@ -330,6 +348,7 @@ def create_app() -> Flask:
               t.id,
               t.service_date,
               t.quantity,
+              t.hpb,
               t.price_override,
               t.commission_type_override,
               t.commission_value_override,
@@ -377,6 +396,7 @@ def create_app() -> Flask:
                     "therapist_name": r["therapist_name"],
                     "menu_name": r["menu_name"],
                     "quantity": int(r["quantity"]),
+                    "hpb": int(r["hpb"] or 0),
                     "price": price,
                     "sales": sales,
                     "rule_type": rule.commission_type,
@@ -455,7 +475,7 @@ def create_app() -> Flask:
 
             w.writerow([])
             w.writerow(["明細"])
-            w.writerow(["施術ID", "セラピスト", "メニュー", "数量", "単価(円)", "売上(円)", "歩合タイプ", "歩合値", "支払(円)", "メモ"])
+            w.writerow(["施術ID", "セラピスト", "メニュー", "数量", "HPB", "単価(円)", "売上(円)", "歩合タイプ", "歩合値", "支払(円)", "メモ"])
             for d in details:
                 w.writerow(
                     [
@@ -463,6 +483,7 @@ def create_app() -> Flask:
                         d["therapist_name"],
                         d["menu_name"],
                         d["quantity"],
+                        d["hpb"],
                         d["price"],
                         d["sales"],
                         d["rule_type"],

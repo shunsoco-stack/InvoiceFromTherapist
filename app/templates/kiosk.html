@@ -46,6 +46,10 @@
           </div>
 
           <div id="actionsRow" class="actions kiosk__actions kioskRow--hidden">
+            <div class="kioskInlineField">
+              <label class="kioskLabel" for="hpb">HPB</label>
+              <input id="hpb" name="hpb" class="kioskInput" type="number" inputmode="numeric" min="0" value="0" />
+            </div>
             <button class="btn kiosk__btn kiosk__btn--primary" type="submit">保存 / Save / บันทึก</button>
             <a class="btn btn--secondary kiosk__btn" href="{{ url_for('report_daily', date=service_date) }}">レポート（管理者）</a>
           </div>
@@ -61,6 +65,7 @@
             {% for s in summaries %}
               {% set items = items_by_therapist.get(s.therapist_id, []) %}
               {% set shop_share = (s.sales_total|int) - (s.payout_total|int) %}
+              {% set hpb_total = hpb_totals.get(s.therapist_id, 0) %}
               <div class="kioskSheet">
                 <table class="kioskSheetTable">
                   <thead>
@@ -97,6 +102,10 @@
                     <tr>
                       <td class="kioskSheetTd">店舗</td>
                       <td class="kioskSheetTd kioskSheetTd--right mono">{{ "{:,}".format(shop_share) }}</td>
+                    </tr>
+                    <tr>
+                      <td class="kioskSheetTd">HPB</td>
+                      <td class="kioskSheetTd kioskSheetTd--right mono">{{ "{:,}".format(hpb_total) }}</td>
                     </tr>
                   </tfoot>
                 </table>

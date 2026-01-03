@@ -33,6 +33,7 @@ CREATE TABLE IF NOT EXISTS treatments (
   therapist_id INTEGER NOT NULL,
   menu_id INTEGER NOT NULL,
   quantity INTEGER NOT NULL DEFAULT 1,
+  hpb INTEGER NOT NULL DEFAULT 0, -- numeric input (e.g. HPB)
   price_override INTEGER,        -- nullable
   commission_type_override TEXT, -- nullable
   commission_value_override INTEGER,
@@ -82,9 +83,21 @@ def init_db() -> None:
     conn = connect()
     try:
         conn.executescript(SCHEMA_SQL)
+        # Lightweight migrations for existing DBs
+        _ensure_column(conn, table="treatments", column="hpb", col_def="INTEGER NOT NULL DEFAULT 0")
         conn.commit()
     finally:
         conn.close()
+
+
+def _ensure_column(conn: sqlite3.Connection, table: str, column: str, col_def: str) -> None:
+    cols = q(conn, f"PRAGMA table_info({table})")
+    existing = {str(r["name"]) for r in cols}
+    if column in existing:
+        return
+    conn.execute(f"ALTER TABLE {table} ADD COLUMN {column} {col_def}")
+    # Backfill existing rows if needed (DEFAULT handles new inserts; old rows become NULL on add in SQLite)
+    conn.execute(f"UPDATE {table} SET {column} = 0 WHERE {column} IS NULL")
 
 
 def q(conn: sqlite3.Connection, sql: str, args: Tuple[Any, ...] = ()) -> List[sqlite3.Row]:
