@@ -79,8 +79,8 @@ def create_app() -> Flask:
         if p < 0:
             flash("P must be 0+ / P ต้องมากกว่าหรือเท่ากับ 0", "error")
             return redirect(url_for("kiosk", date=service_date))
-        if r not in (500, 1000):
-            flash("R must be 500 or 1000 / R ต้องเป็น 500 หรือ 1000", "error")
+        if r not in (0, 500, 1000):
+            flash("R must be none/500/1000 / R ต้องเป็น ไม่มี/500/1000", "error")
             return redirect(url_for("kiosk", date=service_date))
 
         conn = connect()
@@ -138,8 +138,8 @@ def create_app() -> Flask:
         if hpb < 0 or p < 0:
             flash("HPB/P must be 0+ / HPB/P ต้องมากกว่าหรือเท่ากับ 0", "error")
             return redirect(url_for("kiosk_edit", treatment_id=treatment_id))
-        if r not in (500, 1000):
-            flash("R must be 500 or 1000 / R ต้องเป็น 500 หรือ 1000", "error")
+        if r not in (0, 500, 1000):
+            flash("R must be none/500/1000 / R ต้องเป็น ไม่มี/500/1000", "error")
             return redirect(url_for("kiosk_edit", treatment_id=treatment_id))
 
         conn = connect()

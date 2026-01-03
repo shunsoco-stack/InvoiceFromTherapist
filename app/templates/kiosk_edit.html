@@ -43,8 +43,9 @@
           </div>
           <div class="kioskInlineField">
             <label class="kioskLabel" for="r">R（指名料）</label>
-            {% set rv = treatment.r if treatment.r is not none else 500 %}
+            {% set rv = treatment.r if treatment.r is not none else 0 %}
             <select id="r" name="r" class="kioskSelect kioskSelect--small" required>
+              <option value="0" {% if rv == 0 %}selected{% endif %}>なし</option>
               <option value="500" {% if rv == 500 %}selected{% endif %}>500</option>
               <option value="1000" {% if rv == 1000 %}selected{% endif %}>1000</option>
             </select>
