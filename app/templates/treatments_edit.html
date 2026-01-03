@@ -1,0 +1,95 @@
+{% extends "base.html" %}
+{% set title = "施術編集" %}
+{% block content %}
+  <div class="page-head">
+    <h1>施術編集</h1>
+    <p class="muted">入力ミスを後から修正できます（/kioskで入れた分もOK）。</p>
+  </div>
+
+  <section class="card">
+    <form class="form" method="post" action="{{ url_for('treatments_edit_post', treatment_id=treatment.id) }}">
+      <div class="grid-2">
+        <div class="form-row">
+          <label>日付</label>
+          <input name="service_date" type="date" value="{{ treatment.service_date }}" />
+        </div>
+
+        <div class="form-row">
+          <label>数量</label>
+          <input name="quantity" type="number" inputmode="numeric" min="1" value="{{ treatment.quantity }}" />
+        </div>
+
+        <div class="form-row">
+          <label>セラピスト</label>
+          <select name="therapist_id" required>
+            {% for th in therapists %}
+              <option value="{{ th.id }}" {% if th.id == treatment.therapist_id %}selected{% endif %}>
+                {{ th.name }}{% if not th.is_active %}（無効）{% endif %}
+              </option>
+            {% endfor %}
+          </select>
+        </div>
+
+        <div class="form-row">
+          <label>メニュー</label>
+          <select name="menu_id" required>
+            {% for m in menus %}
+              <option value="{{ m.id }}" {% if m.id == treatment.menu_id %}selected{% endif %}>
+                {{ m.name }}{% if not m.is_active %}（無効）{% endif %}
+              </option>
+            {% endfor %}
+          </select>
+        </div>
+
+        <div class="form-row">
+          <label>HPB</label>
+          <input name="hpb" type="number" inputmode="numeric" min="0" value="{{ treatment.hpb if treatment.hpb is not none else 0 }}" />
+        </div>
+
+        <div class="form-row">
+          <label>P</label>
+          <input name="p" type="number" inputmode="numeric" min="0" value="{{ treatment.p if treatment.p is not none else 0 }}" />
+        </div>
+
+        <div class="form-row">
+          <label>R</label>
+          <select name="r">
+            {% set rv = treatment.r if treatment.r is not none else 0 %}
+            <option value="0" {% if rv == 0 %}selected{% endif %}>なし</option>
+            <option value="500" {% if rv == 500 %}selected{% endif %}>500</option>
+            <option value="1000" {% if rv == 1000 %}selected{% endif %}>1000</option>
+          </select>
+        </div>
+
+        <div class="form-row">
+          <label>単価（上書き・任意）</label>
+          <input name="price_override" type="number" inputmode="numeric" min="0" value="{{ treatment.price_override if treatment.price_override is not none else '' }}" placeholder="空欄ならメニュー単価" />
+        </div>
+
+        <div class="form-row">
+          <label>歩合（上書き・任意）</label>
+          <div class="inline">
+            {% set ct = treatment.commission_type_override %}
+            <select name="commission_type_override">
+              <option value="" {% if not ct %}selected{% endif %}>（上書きしない）</option>
+              <option value="percent" {% if ct == "percent" %}selected{% endif %}>％</option>
+              <option value="fixed" {% if ct == "fixed" %}selected{% endif %}>固定（円/件）</option>
+            </select>
+            <input name="commission_value_override" type="number" inputmode="numeric" value="{{ treatment.commission_value_override if treatment.commission_value_override is not none else '' }}" placeholder="例）60 または 3500" />
+          </div>
+        </div>
+
+        <div class="form-row">
+          <label>メモ</label>
+          <input name="notes" value="{{ treatment.notes if treatment.notes is not none else '' }}" />
+        </div>
+      </div>
+
+      <div class="actions">
+        <button class="btn" type="submit">保存</button>
+        <a class="btn btn--secondary" href="{{ url_for('treatments_list', date=treatment.service_date) }}">戻る</a>
+      </div>
+    </form>
+  </section>
+{% endblock %}
+

@@ -427,6 +427,119 @@ def create_app() -> Flask:
         finally:
             conn.close()
 
+    @app.get("/treatments/<int:treatment_id>/edit")
+    def treatments_edit(treatment_id: int):
+        conn = connect()
+        try:
+            t = q1(
+                conn,
+                """
+                SELECT t.*, th.name AS therapist_name, m.name AS menu_name
+                FROM treatments t
+                JOIN therapists th ON th.id = t.therapist_id
+                JOIN menus m ON m.id = t.menu_id
+                WHERE t.id = ?
+                """,
+                (treatment_id,),
+            )
+            if not t:
+                flash("対象の施術が見つかりません。", "error")
+                return redirect(url_for("treatments_list"))
+
+            therapists = q(conn, "SELECT * FROM therapists ORDER BY is_active DESC, name ASC, id ASC")
+            menus = q(conn, "SELECT * FROM menus ORDER BY is_active DESC, name ASC, id ASC")
+
+            return render_template(
+                "treatments_edit.html",
+                treatment=t,
+                therapists=therapists,
+                menus=menus,
+            )
+        finally:
+            conn.close()
+
+    @app.post("/treatments/<int:treatment_id>/edit")
+    def treatments_edit_post(treatment_id: int):
+        service_date = (request.form.get("service_date") or date.today().isoformat()).strip()
+        therapist_id = int(request.form.get("therapist_id") or "0")
+        menu_id = int(request.form.get("menu_id") or "0")
+        quantity = int(request.form.get("quantity") or "1")
+        notes = (request.form.get("notes") or "").strip() or None
+
+        hpb = int(request.form.get("hpb") or "0")
+        p = int(request.form.get("p") or "0")
+        r = int(request.form.get("r") or "0")
+
+        price_override_raw = (request.form.get("price_override") or "").strip()
+        price_override = int(price_override_raw) if price_override_raw else None
+
+        commission_type_override = (request.form.get("commission_type_override") or "").strip() or None
+        commission_value_override_raw = (request.form.get("commission_value_override") or "").strip()
+        commission_value_override = int(commission_value_override_raw) if commission_value_override_raw else None
+
+        if therapist_id <= 0 or menu_id <= 0:
+            flash("セラピストとメニューを選択してください。", "error")
+            return redirect(url_for("treatments_edit", treatment_id=treatment_id))
+        if quantity <= 0:
+            flash("数量が不正です。", "error")
+            return redirect(url_for("treatments_edit", treatment_id=treatment_id))
+        if hpb < 0 or p < 0:
+            flash("HPB/Pが不正です。", "error")
+            return redirect(url_for("treatments_edit", treatment_id=treatment_id))
+        if r not in (0, 500, 1000):
+            flash("Rが不正です。", "error")
+            return redirect(url_for("treatments_edit", treatment_id=treatment_id))
+        if commission_type_override is not None and commission_type_override not in ("percent", "fixed"):
+            flash("歩合(上書き)のタイプが不正です。", "error")
+            return redirect(url_for("treatments_edit", treatment_id=treatment_id))
+        if commission_type_override is None:
+            commission_value_override = None
+
+        conn = connect()
+        try:
+            row = q1(conn, "SELECT id FROM treatments WHERE id = ?", (treatment_id,))
+            if not row:
+                flash("対象の施術が見つかりません。", "error")
+                return redirect(url_for("treatments_list", date=service_date))
+
+            conn.execute(
+                """
+                UPDATE treatments
+                SET
+                  service_date = ?,
+                  therapist_id = ?,
+                  menu_id = ?,
+                  quantity = ?,
+                  hpb = ?,
+                  p = ?,
+                  r = ?,
+                  price_override = ?,
+                  commission_type_override = ?,
+                  commission_value_override = ?,
+                  notes = ?
+                WHERE id = ?
+                """,
+                (
+                    service_date,
+                    therapist_id,
+                    menu_id,
+                    quantity,
+                    hpb,
+                    p,
+                    r,
+                    price_override,
+                    commission_type_override,
+                    commission_value_override,
+                    notes,
+                    treatment_id,
+                ),
+            )
+            conn.commit()
+            flash("施術を更新しました。", "ok")
+            return redirect(url_for("treatments_list", date=service_date))
+        finally:
+            conn.close()
+
     # ----------------
     # Reports / Payouts
     # ----------------

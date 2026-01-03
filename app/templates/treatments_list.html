@@ -119,10 +119,13 @@
               <td class="mono">{{ t.r if t.r is not none else 0 }}</td>
               <td class="muted">{{ t.notes or "" }}</td>
               <td class="right">
-                <form method="post" action="{{ url_for('treatments_delete', treatment_id=t.id) }}" onsubmit="return confirm('削除しますか？');">
-                  <input type="hidden" name="service_date" value="{{ service_date }}" />
-                  <button class="btn btn--danger" type="submit">削除</button>
-                </form>
+                <div class="actions" style="justify-content:flex-end; margin:0;">
+                  <a class="btn btn--secondary" href="{{ url_for('treatments_edit', treatment_id=t.id) }}">編集</a>
+                  <form method="post" action="{{ url_for('treatments_delete', treatment_id=t.id) }}" onsubmit="return confirm('削除しますか？');">
+                    <input type="hidden" name="service_date" value="{{ service_date }}" />
+                    <button class="btn btn--danger" type="submit">削除</button>
+                  </form>
+                </div>
               </td>
             </tr>
           {% endfor %}
