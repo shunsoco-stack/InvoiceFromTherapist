@@ -1,0 +1,45 @@
+<!doctype html>
+<html lang="ja">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>{{ title or "サロン日報" }}</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}" />
+  </head>
+  <body>
+    <header class="header">
+      <div class="container header__inner">
+        <div class="brand">
+          <a href="{{ url_for('index') }}">サロン日報</a>
+        </div>
+        <nav class="nav">
+          <a href="{{ url_for('treatments_list') }}">施術入力</a>
+          <a href="{{ url_for('report_daily') }}">日次レポート</a>
+          <a href="{{ url_for('therapists_list') }}">セラピスト</a>
+          <a href="{{ url_for('menus_list') }}">メニュー</a>
+        </nav>
+      </div>
+    </header>
+
+    <main class="container">
+      {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+          <div class="flash">
+            {% for category, message in messages %}
+              <div class="flash__item flash__item--{{ category }}">{{ message }}</div>
+            {% endfor %}
+          </div>
+        {% endif %}
+      {% endwith %}
+
+      {% block content %}{% endblock %}
+    </main>
+
+    <footer class="footer">
+      <div class="container footer__inner">
+        <span class="muted">ローカル用の簡易システム（SQLite）</span>
+      </div>
+    </footer>
+  </body>
+</html>
+

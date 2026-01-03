@@ -1,0 +1,27 @@
+{% extends "base.html" %}
+{% set title = "トップ" %}
+{% block content %}
+  <div class="grid">
+    <section class="card">
+      <h2>今日の入力</h2>
+      <p class="muted">まずは施術を記録して、レポートで日払い金額を確認します。</p>
+      <div class="actions">
+        <a class="btn" href="{{ url_for('treatments_list', date=today) }}">施術入力（{{ today }}）</a>
+        <a class="btn btn--secondary" href="{{ url_for('report_daily', date=today) }}">日次レポート（{{ today }}）</a>
+      </div>
+    </section>
+
+    <section class="card">
+      <h2>初期設定</h2>
+      <ul class="list">
+        <li>セラピストを登録（歩合: % / 固定）</li>
+        <li>メニューを登録（単価、必要ならメニュー別歩合）</li>
+      </ul>
+      <div class="actions">
+        <a class="btn btn--secondary" href="{{ url_for('therapists_list') }}">セラピスト</a>
+        <a class="btn btn--secondary" href="{{ url_for('menus_list') }}">メニュー</a>
+      </div>
+    </section>
+  </div>
+{% endblock %}
+
