@@ -23,6 +23,53 @@ def create_app() -> Flask:
         return render_template("index.html", today=today)
 
     # ----------------
+    # Kiosk (simple input for therapists)
+    # ----------------
+    @app.get("/kiosk")
+    def kiosk():
+        service_date = (request.args.get("date") or date.today().isoformat()).strip()
+        conn = connect()
+        try:
+            therapists, menus = _load_active_therapists_and_menus(conn)
+            return render_template(
+                "kiosk.html",
+                service_date=service_date,
+                therapists=therapists,
+                menus=menus,
+            )
+        finally:
+            conn.close()
+
+    @app.post("/kiosk/new")
+    def kiosk_new():
+        service_date = (request.form.get("service_date") or date.today().isoformat()).strip()
+        therapist_id = int(request.form.get("therapist_id") or "0")
+        menu_id = int(request.form.get("menu_id") or "0")
+        quantity = int(request.form.get("quantity") or "1")
+
+        if therapist_id <= 0 or menu_id <= 0:
+            flash("Please select therapist and menu / กรุณาเลือกพนักงานและเมนู", "error")
+            return redirect(url_for("kiosk", date=service_date))
+        if quantity <= 0:
+            flash("Quantity must be 1+ / จำนวนต้องมากกว่า 0", "error")
+            return redirect(url_for("kiosk", date=service_date))
+
+        conn = connect()
+        try:
+            exec1(
+                conn,
+                """
+                INSERT INTO treatments(service_date, therapist_id, menu_id, quantity, notes, created_at)
+                VALUES (?, ?, ?, ?, NULL, ?)
+                """,
+                (service_date, therapist_id, menu_id, quantity, now_iso()),
+            )
+            flash("Saved / บันทึกแล้ว", "ok")
+            return redirect(url_for("kiosk", date=service_date))
+        finally:
+            conn.close()
+
+    # ----------------
     # Therapists
     # ----------------
     @app.get("/therapists")

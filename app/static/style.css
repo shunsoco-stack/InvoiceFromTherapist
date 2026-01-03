@@ -140,3 +140,66 @@ input::placeholder{ color: rgba(169,180,202,.7); }
 
 .list{ margin: 8px 0 0 18px; color: var(--muted); }
 
+/* Kiosk / Simple input (touch friendly) */
+.kiosk{ max-width: 980px; margin: 0 auto; }
+.kiosk__head{ margin: 6px 0 10px; }
+.kiosk__title{ font-size: 28px; margin: 0 0 4px; }
+.kiosk__subtitle{ font-size: 14px; }
+.kiosk__card{ padding: 16px; }
+.kiosk__btn{ font-size: 18px; padding: 12px 14px; border-radius: 14px; }
+.kiosk__btn--primary{ border-color: rgba(46,204,113,.6); background: rgba(46,204,113,.14); }
+.kiosk__btn--primary:hover{ background: rgba(46,204,113,.20); }
+.kiosk__dateInput{ font-size: 18px; padding: 12px 14px; border-radius: 14px; }
+.kiosk__step{ margin-top: 16px; }
+.kiosk__actions{ margin-top: 14px; }
+
+.pickGrid{
+  display:grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+@media (min-width: 900px){
+  .pickGrid{ grid-template-columns: repeat(4, minmax(0, 1fr)); }
+}
+.pickGrid--menus{
+  grid-template-columns: repeat(1, minmax(0, 1fr));
+}
+@media (min-width: 720px){
+  .pickGrid--menus{ grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@media (min-width: 1100px){
+  .pickGrid--menus{ grid-template-columns: repeat(3, minmax(0, 1fr)); }
+}
+
+.pick{
+  display:block;
+  border: 1px solid var(--border);
+  background: rgba(255,255,255,.04);
+  border-radius: 16px;
+  padding: 14px 12px;
+  cursor: pointer;
+  user-select:none;
+  min-height: 58px;
+}
+.pick:hover{ background: rgba(255,255,255,.06); }
+.pick input{ display:none; }
+.pick__label{ display:flex; flex-direction: column; gap: 4px; }
+.pick__main{ font-size: 16px; font-weight: 700; }
+.pick__sub{ font-size: 13px; }
+.pick input:checked + .pick__label{
+  outline: 2px solid rgba(79,140,255,.75);
+  background: rgba(79,140,255,.10);
+  border-radius: 12px;
+  padding: 4px 6px;
+}
+
+.kioskQty{ display:flex; align-items:center; gap: 10px; flex-wrap: wrap; }
+.kioskQty__btn{ min-width: 64px; }
+.kioskQty__input{
+  width: 160px;
+  font-size: 22px;
+  text-align: center;
+  padding: 12px 14px;
+  border-radius: 14px;
+}
+

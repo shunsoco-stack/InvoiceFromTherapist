@@ -1,0 +1,90 @@
+{% extends "base.html" %}
+{% set title = "簡単入力 / Simple" %}
+{% block content %}
+  <div class="kiosk">
+    <div class="kiosk__head">
+      <h1 class="kiosk__title">簡単入力 / Simple</h1>
+      <div class="kiosk__subtitle muted">Therapist input / สำหรับพนักงาน</div>
+    </div>
+
+    <section class="card kiosk__card">
+      <h2>日付 / Date / วันที่</h2>
+      <form class="inline kiosk__date" method="get" action="{{ url_for('kiosk') }}">
+        <input class="kiosk__dateInput" name="date" type="date" value="{{ service_date }}" />
+        <button class="btn btn--secondary kiosk__btn" type="submit">表示 / Show</button>
+      </form>
+    </section>
+
+    {% if therapists|length == 0 or menus|length == 0 %}
+      <section class="card kiosk__card">
+        <h2>最初の準備 / Setup</h2>
+        <p class="muted">管理者が「セラピスト」「メニュー」を先に登録してください。</p>
+        <div class="actions">
+          <a class="btn btn--secondary kiosk__btn" href="{{ url_for('therapists_list') }}">セラピスト</a>
+          <a class="btn btn--secondary kiosk__btn" href="{{ url_for('menus_list') }}">メニュー</a>
+        </div>
+      </section>
+    {% else %}
+      <section class="card kiosk__card">
+        <h2>1) セラピスト / Therapist / พนักงาน</h2>
+        <form method="post" action="{{ url_for('kiosk_new') }}">
+          <input type="hidden" name="service_date" value="{{ service_date }}" />
+
+          <div class="pickGrid">
+            {% for t in therapists %}
+              <label class="pick">
+                <input type="radio" name="therapist_id" value="{{ t.id }}" required />
+                <span class="pick__label">{{ t.name }}</span>
+              </label>
+            {% endfor %}
+          </div>
+
+          <h2 class="kiosk__step">2) メニュー / Menu / เมนู</h2>
+          <div class="pickGrid pickGrid--menus">
+            {% for m in menus %}
+              <label class="pick pick--menu">
+                <input type="radio" name="menu_id" value="{{ m.id }}" required />
+                <span class="pick__label">
+                  <span class="pick__main">{{ m.name }}</span>
+                  <span class="pick__sub muted">{{ "{:,}".format(m.price) }}円</span>
+                </span>
+              </label>
+            {% endfor %}
+          </div>
+
+          <h2 class="kiosk__step">3) 数 / Qty / จำนวน</h2>
+          <div class="kioskQty">
+            <button class="btn btn--secondary kiosk__btn kioskQty__btn" type="button" onclick="decQty()">−</button>
+            <input id="qty" class="kioskQty__input" name="quantity" type="number" inputmode="numeric" value="1" min="1" />
+            <button class="btn btn--secondary kiosk__btn kioskQty__btn" type="button" onclick="incQty()">＋</button>
+          </div>
+
+          <div class="actions kiosk__actions">
+            <button class="btn kiosk__btn kiosk__btn--primary" type="submit">保存 / Save / บันทึก</button>
+            <a class="btn btn--secondary kiosk__btn" href="{{ url_for('report_daily', date=service_date) }}">レポート（管理者）</a>
+          </div>
+        </form>
+      </section>
+
+      <section class="card kiosk__card">
+        <h2>ヘルプ / Help</h2>
+        <ul class="list">
+          <li>押す順番: <b>セラピスト → メニュー → 数 → 保存</b></li>
+          <li>間違えたらもう一回入れ直して、管理者が「施術入力」で削除できます。</li>
+        </ul>
+      </section>
+
+      <script>
+        function incQty() {
+          const el = document.getElementById('qty');
+          el.value = Math.max(1, (parseInt(el.value || '1', 10) || 1) + 1);
+        }
+        function decQty() {
+          const el = document.getElementById('qty');
+          el.value = Math.max(1, (parseInt(el.value || '1', 10) || 1) - 1);
+        }
+      </script>
+    {% endif %}
+  </div>
+{% endblock %}
+

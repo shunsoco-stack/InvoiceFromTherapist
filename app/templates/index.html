@@ -6,6 +6,7 @@
       <h2>今日の入力</h2>
       <p class="muted">まずは施術を記録して、レポートで日払い金額を確認します。</p>
       <div class="actions">
+        <a class="btn" href="{{ url_for('kiosk', date=today) }}">簡単入力（{{ today }}）</a>
         <a class="btn" href="{{ url_for('treatments_list', date=today) }}">施術入力（{{ today }}）</a>
         <a class="btn btn--secondary" href="{{ url_for('report_daily', date=today) }}">日次レポート（{{ today }}）</a>
       </div>
