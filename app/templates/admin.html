@@ -3,22 +3,22 @@
 {% block content %}
   <div class="page-head">
     <h1>管理 / จัดการ</h1>
-    <p class="muted">レポート確認・登録・修正はこちら。</p>
+    <p class="muted">レポート確認・登録・修正はこちら。 / รายงาน・เพิ่มข้อมูล・แก้ไข</p>
   </div>
 
   <section class="card">
     <h2>今日（{{ today }}）</h2>
     <div class="actions">
-      <a class="btn" href="{{ url_for('report_daily', date=today) }}">日次レポート</a>
-      <a class="btn btn--secondary" href="{{ url_for('treatments_list', date=today) }}">施術入力（詳細）</a>
+      <a class="btn" href="{{ url_for('report_daily', date=today) }}">日次レポート / รายงาน</a>
+      <a class="btn btn--secondary" href="{{ url_for('treatments_list', date=today) }}">施術入力（詳細）/ รายการ</a>
     </div>
   </section>
 
   <section class="card">
     <h2>登録</h2>
     <div class="actions">
-      <a class="btn btn--secondary" href="{{ url_for('therapists_list') }}">セラピスト</a>
-      <a class="btn btn--secondary" href="{{ url_for('menus_list') }}">メニュー</a>
+      <a class="btn btn--secondary" href="{{ url_for('therapists_list') }}">セラピスト / พนักงาน</a>
+      <a class="btn btn--secondary" href="{{ url_for('menus_list') }}">メニュー / เมนู</a>
     </div>
   </section>
 
@@ -26,7 +26,7 @@
     <h2>セラピスト用</h2>
     <div class="actions">
       <a class="btn" href="{{ url_for('kiosk') }}">施術入力（簡単）/ บันทึก</a>
-      <a class="btn btn--secondary" href="{{ url_for('index') }}">トップへ戻る</a>
+      <a class="btn btn--secondary" href="{{ url_for('index') }}">トップへ戻る / กลับ</a>
     </div>
   </section>
 {% endblock %}
