@@ -34,15 +34,15 @@
 
         <div class="kioskInlineFields">
           <div class="kioskInlineField">
-            <label class="kioskLabel" for="hpb">HPB</label>
+            <label class="kioskLabel" for="hpb">HPB（割引）</label>
             <input id="hpb" name="hpb" class="kioskInput" type="number" inputmode="numeric" min="0" value="{{ treatment.hpb if treatment.hpb is not none else 0 }}" />
           </div>
           <div class="kioskInlineField">
-            <label class="kioskLabel" for="p">P</label>
+            <label class="kioskLabel" for="p">P（ポイント）</label>
             <input id="p" name="p" class="kioskInput" type="number" inputmode="numeric" min="0" value="{{ treatment.p if treatment.p is not none else 0 }}" />
           </div>
           <div class="kioskInlineField">
-            <label class="kioskLabel" for="r">R</label>
+            <label class="kioskLabel" for="r">R（指名料）</label>
             {% set rv = treatment.r if treatment.r is not none else 500 %}
             <select id="r" name="r" class="kioskSelect kioskSelect--small" required>
               <option value="500" {% if rv == 500 %}selected{% endif %}>500</option>

@@ -7,7 +7,7 @@ import os
 
 from flask import Flask, Response, flash, redirect, render_template, request, url_for
 
-from app.calc import calc_payout_yen, pick_commission_rule
+from app.calc import calc_payout_yen, calc_treatment_yen, pick_commission_rule
 from app.db import connect, exec1, init_db, now_iso, q, q1
 
 
@@ -691,7 +691,14 @@ def create_app() -> Flask:
                 r["therapist_commission_type"],
                 r["therapist_commission_value"],
             )
-            sales, payout = calc_payout_yen(price, int(r["quantity"]), rule)
+            gross_menu, discount_total, net_menu, sales, payout = calc_treatment_yen(
+                unit_price_yen=price,
+                quantity=int(r["quantity"]),
+                rule=rule,
+                hpb_discount_yen=int(r["hpb"] or 0),
+                p_points_yen=int(r["p"] or 0),
+                r_nomination_fee_yen=int(r["r"] or 0),
+            )
 
             detail_lines.append(
                 {
@@ -704,6 +711,9 @@ def create_app() -> Flask:
                     "p": int(r["p"] or 0),
                     "r": int(r["r"] or 0),
                     "price": price,
+                    "gross_menu": gross_menu,
+                    "discount_total": discount_total,
+                    "net_menu": net_menu,
                     "sales": sales,
                     "rule_type": rule.commission_type,
                     "rule_value": rule.commission_value,
