@@ -65,7 +65,8 @@ def create_app() -> Flask:
         # シンプル運用のため日付は「今日」で固定（変更不可）
         service_date = date.today().isoformat()
         therapist_id = int(request.form.get("therapist_id") or "0")
-        menu_id = int(request.form.get("menu_id") or "0")
+        menu_id_1 = int(request.form.get("menu_id_1") or "0")
+        menu_id_2 = int(request.form.get("menu_id_2") or "0")
         hpb = int(request.form.get("hpb") or "0")
         p = int(request.form.get("p") or "0")
         r = int(request.form.get("r") or "0")
@@ -73,7 +74,7 @@ def create_app() -> Flask:
         # シンプル運用: 1回の保存=1件として固定
         quantity = 1
 
-        if therapist_id <= 0 or menu_id <= 0:
+        if therapist_id <= 0 or menu_id_1 <= 0:
             flash("Please select therapist and menu / กรุณาเลือกพนักงานและเมนู", "error")
             return redirect(url_for("kiosk", date=service_date))
         if hpb < 0:
@@ -88,14 +89,23 @@ def create_app() -> Flask:
 
         conn = connect()
         try:
-            exec1(
-                conn,
+            # 最大2メニュー。割引/ポイント/指名料は1件目にのみ付けて二重計上を防ぐ。
+            conn.execute(
                 """
                 INSERT INTO treatments(service_date, therapist_id, menu_id, quantity, hpb, p, r, notes, created_at)
                 VALUES (?, ?, ?, ?, ?, ?, ?, NULL, ?)
                 """,
-                (service_date, therapist_id, menu_id, quantity, hpb, p, r, now_iso()),
+                (service_date, therapist_id, menu_id_1, quantity, hpb, p, r, now_iso()),
             )
+            if menu_id_2 > 0:
+                conn.execute(
+                    """
+                    INSERT INTO treatments(service_date, therapist_id, menu_id, quantity, hpb, p, r, notes, created_at)
+                    VALUES (?, ?, ?, ?, 0, 0, 0, NULL, ?)
+                    """,
+                    (service_date, therapist_id, menu_id_2, quantity, now_iso()),
+                )
+            conn.commit()
             flash("Saved / บันทึกแล้ว", "ok")
             if continue_add:
                 # 同じセラピストで続けてメニューを追加しやすくする

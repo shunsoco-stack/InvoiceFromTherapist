@@ -36,9 +36,19 @@
           </div>
 
           <div id="menuRow" class="kioskRow kioskRow--hidden">
-            <div class="kioskLabel">2) メニュー / Menu（T/60）</div>
-            <select id="menuSelect" class="kioskSelect" name="menu_id" required disabled>
+            <div class="kioskLabel">2) メニュー① / Menu 1（T/60）</div>
+            <select id="menuSelect1" class="kioskSelect" name="menu_id_1" required disabled>
               <option value="" selected disabled>เลือกเมนู / Select</option>
+              {% for m in menus %}
+                <option value="{{ m.id }}">{{ m.name }}</option>
+              {% endfor %}
+            </select>
+          </div>
+
+          <div id="menuRow2" class="kioskRow kioskRow--hidden">
+            <div class="kioskLabel">3) メニュー②（任意） / Menu 2 (optional)</div>
+            <select id="menuSelect2" class="kioskSelect" name="menu_id_2" disabled>
+              <option value="0" selected>（なし / none）</option>
               {% for m in menus %}
                 <option value="{{ m.id }}">{{ m.name }}</option>
               {% endfor %}
@@ -189,7 +199,7 @@
       <section class="card kiosk__card">
         <h2>ヘルプ / Help</h2>
         <ul class="list">
-          <li>押す順番: <b>セラピスト → メニュー → 保存</b></li>
+          <li>押す順番: <b>セラピスト → メニュー① → （メニュー②） → 保存</b></li>
           <li>間違えたらもう一回入れ直して、管理者が「施術入力」で削除できます。</li>
         </ul>
       </section>
@@ -197,15 +207,19 @@
       <script>
         const therapistSelect = document.getElementById('therapistSelect');
         const menuRow = document.getElementById('menuRow');
-        const menuSelect = document.getElementById('menuSelect');
+        const menuRow2 = document.getElementById('menuRow2');
+        const menuSelect1 = document.getElementById('menuSelect1');
+        const menuSelect2 = document.getElementById('menuSelect2');
         const actionsRow = document.getElementById('actionsRow');
 
         function showMenuStep() {
           menuRow.classList.remove('kioskRow--hidden');
-          menuSelect.disabled = false;
+          menuSelect1.disabled = false;
         }
 
-        function showActions() {
+        function showMenu2AndActions() {
+          menuRow2.classList.remove('kioskRow--hidden');
+          menuSelect2.disabled = false;
           actionsRow.classList.remove('kioskRow--hidden');
         }
 
@@ -213,14 +227,17 @@
           if (therapistSelect.value) {
             showMenuStep();
             // reset menu/actions for next input
-            menuSelect.value = "";
+            menuSelect1.value = "";
+            menuSelect2.value = "0";
+            menuRow2.classList.add('kioskRow--hidden');
+            menuSelect2.disabled = true;
             actionsRow.classList.add('kioskRow--hidden');
           }
         });
 
-        menuSelect.addEventListener('change', () => {
-          if (menuSelect.value) {
-            showActions();
+        menuSelect1.addEventListener('change', () => {
+          if (menuSelect1.value) {
+            showMenu2AndActions();
           }
         });
 
