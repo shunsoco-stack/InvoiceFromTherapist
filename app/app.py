@@ -32,8 +32,8 @@ def create_app() -> Flask:
     # ----------------
     @app.get("/kiosk")
     def kiosk():
-        # シンプル運用のため日付は「今日」で固定（変更不可）
-        service_date = date.today().isoformat()
+        # 過去日付も入力できるようにする（デフォルトは今日）
+        service_date = (request.args.get("date") or date.today().isoformat()).strip()
         selected_therapist_id = int(request.args.get("therapist_id") or "0")
         conn = connect()
         try:
@@ -62,8 +62,8 @@ def create_app() -> Flask:
 
     @app.post("/kiosk/new")
     def kiosk_new():
-        # シンプル運用のため日付は「今日」で固定（変更不可）
-        service_date = date.today().isoformat()
+        # 過去日付も入力できるようにする（フォーム優先）
+        service_date = (request.form.get("service_date") or date.today().isoformat()).strip()
         therapist_id = int(request.form.get("therapist_id") or "0")
         menu_id_1 = int(request.form.get("menu_id_1") or "0")
         menu_id_2 = int(request.form.get("menu_id_2") or "0")
@@ -109,14 +109,14 @@ def create_app() -> Flask:
             flash("Saved / บันทึกแล้ว", "ok")
             if continue_add:
                 # 同じセラピストで続けてメニューを追加しやすくする
-                return redirect(url_for("kiosk", therapist_id=therapist_id, _anchor="input"))
+                return redirect(url_for("kiosk", date=service_date, therapist_id=therapist_id, _anchor="input"))
             return redirect(url_for("kiosk", _anchor="summary"))
         finally:
             conn.close()
 
     @app.get("/kiosk/<int:treatment_id>/edit")
     def kiosk_edit(treatment_id: int):
-        today = date.today().isoformat()
+        view_date = (request.args.get("date") or "").strip() or None
         conn = connect()
         try:
             t = q1(
@@ -130,23 +130,33 @@ def create_app() -> Flask:
                 """,
                 (treatment_id,),
             )
-            if not t or str(t["service_date"]) != today:
-                flash("今日の入力のみ修正できます。", "error")
+            if not t:
+                flash("対象の入力が見つかりません。", "error")
                 return redirect(url_for("kiosk", _anchor="history"))
 
-            therapists, menus = _load_active_therapists_and_menus(conn)
-            return render_template("kiosk_edit.html", service_date=today, treatment=t, therapists=therapists, menus=menus)
+            service_date = str(t["service_date"])
+
+            therapists = q(conn, "SELECT * FROM therapists ORDER BY is_active DESC, name ASC, id ASC")
+            menus = q(conn, "SELECT * FROM menus ORDER BY is_active DESC, name ASC, id ASC")
+            return render_template(
+                "kiosk_edit.html",
+                service_date=service_date,
+                treatment=t,
+                therapists=therapists,
+                menus=menus,
+                return_date=view_date or service_date,
+            )
         finally:
             conn.close()
 
     @app.post("/kiosk/<int:treatment_id>/edit")
     def kiosk_edit_post(treatment_id: int):
-        today = date.today().isoformat()
         therapist_id = int(request.form.get("therapist_id") or "0")
         menu_id = int(request.form.get("menu_id") or "0")
         hpb = int(request.form.get("hpb") or "0")
         p = int(request.form.get("p") or "0")
         r = int(request.form.get("r") or "0")
+        return_date = (request.form.get("return_date") or "").strip()
 
         if therapist_id <= 0 or menu_id <= 0:
             flash("Please select therapist and menu / กรุณาเลือกพนักงานและเมนู", "error")
@@ -161,8 +171,8 @@ def create_app() -> Flask:
         conn = connect()
         try:
             row = q1(conn, "SELECT * FROM treatments WHERE id = ?", (treatment_id,))
-            if not row or str(row["service_date"]) != today:
-                flash("今日の入力のみ修正できます。", "error")
+            if not row:
+                flash("対象の入力が見つかりません。", "error")
                 return redirect(url_for("kiosk", _anchor="history"))
 
             conn.execute(
@@ -175,23 +185,25 @@ def create_app() -> Flask:
             )
             conn.commit()
             flash("Updated / แก้ไขแล้ว", "ok")
-            return redirect(url_for("kiosk", _anchor="history"))
+            back_date = return_date or str(row["service_date"])
+            return redirect(url_for("kiosk", date=back_date, _anchor="history"))
         finally:
             conn.close()
 
     @app.post("/kiosk/<int:treatment_id>/delete")
     def kiosk_delete(treatment_id: int):
-        today = date.today().isoformat()
+        return_date = (request.form.get("return_date") or "").strip()
         conn = connect()
         try:
             row = q1(conn, "SELECT * FROM treatments WHERE id = ?", (treatment_id,))
-            if not row or str(row["service_date"]) != today:
-                flash("今日の入力のみ削除できます。", "error")
+            if not row:
+                flash("対象の入力が見つかりません。", "error")
                 return redirect(url_for("kiosk", _anchor="history"))
             conn.execute("DELETE FROM treatments WHERE id = ?", (treatment_id,))
             conn.commit()
             flash("Deleted / ลบแล้ว", "ok")
-            return redirect(url_for("kiosk", _anchor="history"))
+            back_date = return_date or str(row["service_date"])
+            return redirect(url_for("kiosk", date=back_date, _anchor="history"))
         finally:
             conn.close()
 

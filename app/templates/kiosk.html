@@ -22,9 +22,21 @@
         </div>
       </section>
     {% else %}
+      <section class="card kiosk__card">
+        <h2>日付 / วันที่</h2>
+        <form class="inline" method="get" action="{{ url_for('kiosk') }}">
+          <input class="kiosk__dateInput" name="date" type="date" value="{{ service_date }}" />
+          <button class="btn btn--secondary kiosk__btn" type="submit">表示 / แสดง</button>
+          {% if selected_therapist_id %}
+            <input type="hidden" name="therapist_id" value="{{ selected_therapist_id }}" />
+          {% endif %}
+        </form>
+      </section>
+
       <section id="input" class="card kiosk__card">
         <h2>入力 / กรอก</h2>
         <form class="kioskForm" method="post" action="{{ url_for('kiosk_new') }}">
+          <input type="hidden" name="service_date" value="{{ service_date }}" />
           <div class="kioskRow">
             <div class="kioskLabel">1) セラピスト / พนักงาน</div>
             <select id="therapistSelect" class="kioskSelect" name="therapist_id" required>
@@ -81,7 +93,7 @@
       </section>
 
       <section id="summary" class="card kiosk__card">
-        <h2>今日の集計 / สรุปวันนี้（{{ service_date }}）</h2>
+        <h2>集計 / สรุป（{{ service_date }}）</h2>
         {% if summaries|length == 0 %}
           <div class="muted">まだ記録がありません。</div>
         {% else %}
@@ -154,8 +166,8 @@
       </section>
 
       <section id="history" class="card kiosk__card">
-        <h2>今日の履歴（修正/削除）/ ประวัติวันนี้（แก้ไข/ลบ）</h2>
-        <p class="muted">入力ミスを直したい時はここからできます（今日分のみ）。 / แก้ไขได้เฉพาะวันนี้</p>
+        <h2>履歴（修正/削除）/ ประวัติ（แก้ไข/ลบ）</h2>
+        <p class="muted">入力ミスを直したい時はここからできます。 / แก้ไขได้ที่นี่</p>
         <div class="table-wrap">
           <table class="table">
             <thead>
@@ -180,8 +192,9 @@
                   <td class="right mono">{{ r.r }}</td>
                   <td class="right">
                     <div class="actions" style="justify-content:flex-end; margin:0;">
-                      <a class="btn btn--secondary kioskSmallBtn" href="{{ url_for('kiosk_edit', treatment_id=r.id) }}">修正 / แก้ไข</a>
+                      <a class="btn btn--secondary kioskSmallBtn" href="{{ url_for('kiosk_edit', treatment_id=r.id, date=service_date) }}">修正 / แก้ไข</a>
                       <form method="post" action="{{ url_for('kiosk_delete', treatment_id=r.id) }}" onsubmit="return confirm('削除しますか？');">
+                        <input type="hidden" name="return_date" value="{{ service_date }}" />
                         <button class="btn btn--danger kioskSmallBtn" type="submit">削除 / ลบ</button>
                       </form>
                     </div>

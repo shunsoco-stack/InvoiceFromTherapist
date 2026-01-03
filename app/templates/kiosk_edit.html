@@ -14,6 +14,7 @@
     <section class="card kiosk__card">
       <h2>修正内容</h2>
       <form class="kioskForm" method="post" action="{{ url_for('kiosk_edit_post', treatment_id=treatment.id) }}">
+        <input type="hidden" name="return_date" value="{{ return_date }}" />
         <div class="kioskRow">
           <div class="kioskLabel">セラピスト / พนักงาน</div>
           <select class="kioskSelect" name="therapist_id" required>
@@ -45,7 +46,7 @@
             <label class="kioskLabel" for="r">R（指名料）/ ค่าตัว</label>
             {% set rv = treatment.r if treatment.r is not none else 0 %}
             <select id="r" name="r" class="kioskSelect kioskSelect--small" required>
-              <option value="0" {% if rv == 0 %}selected{% endif %}>なし</option>
+              <option value="0" {% if rv == 0 %}selected{% endif %}>なし / ไม่มี</option>
               <option value="500" {% if rv == 500 %}selected{% endif %}>500</option>
               <option value="1000" {% if rv == 1000 %}selected{% endif %}>1000</option>
             </select>
@@ -54,7 +55,7 @@
 
         <div class="actions kiosk__actions">
           <button class="btn kiosk__btn kiosk__btn--primary" type="submit">保存 / บันทึก</button>
-          <a class="btn btn--secondary kiosk__btn" href="{{ url_for('kiosk', _anchor='history') }}">戻る / กลับ</a>
+          <a class="btn btn--secondary kiosk__btn" href="{{ url_for('kiosk', date=return_date, _anchor='history') }}">戻る / กลับ</a>
         </div>
       </form>
     </section>
