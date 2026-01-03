@@ -22,7 +22,7 @@
         </div>
       </section>
     {% else %}
-      <section class="card kiosk__card">
+      <section id="input" class="card kiosk__card">
         <h2>入力 / Input</h2>
         <form class="kioskForm" method="post" action="{{ url_for('kiosk_new') }}">
           <div class="kioskRow">
@@ -30,7 +30,7 @@
             <select id="therapistSelect" class="kioskSelect" name="therapist_id" required>
               <option value="" selected disabled>เลือกพนักงาน / Select</option>
               {% for t in therapists %}
-                <option value="{{ t.id }}">{{ t.name }}</option>
+                <option value="{{ t.id }}" {% if t.id == selected_therapist_id %}selected{% endif %}>{{ t.name }}</option>
               {% endfor %}
             </select>
           </div>
@@ -65,6 +65,7 @@
               </div>
             </div>
             <button class="btn kiosk__btn kiosk__btn--primary" type="submit">保存 / Save / บันทึก</button>
+            <button class="btn btn--secondary kiosk__btn" type="submit" name="continue_add" value="1">保存して続ける</button>
           </div>
         </form>
       </section>
@@ -211,6 +212,9 @@
         therapistSelect.addEventListener('change', () => {
           if (therapistSelect.value) {
             showMenuStep();
+            // reset menu/actions for next input
+            menuSelect.value = "";
+            actionsRow.classList.add('kioskRow--hidden');
           }
         });
 
@@ -219,6 +223,11 @@
             showActions();
           }
         });
+
+        // If therapist is preselected (after "save and continue"), open the next step automatically.
+        if (therapistSelect.value) {
+          showMenuStep();
+        }
       </script>
     {% endif %}
   </div>

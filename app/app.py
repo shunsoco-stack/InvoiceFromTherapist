@@ -34,6 +34,7 @@ def create_app() -> Flask:
     def kiosk():
         # シンプル運用のため日付は「今日」で固定（変更不可）
         service_date = date.today().isoformat()
+        selected_therapist_id = int(request.args.get("therapist_id") or "0")
         conn = connect()
         try:
             therapists, menus = _load_active_therapists_and_menus(conn)
@@ -54,6 +55,7 @@ def create_app() -> Flask:
                 p_totals=p_totals,
                 r_totals=r_totals,
                 recent=recent,
+                selected_therapist_id=selected_therapist_id,
             )
         finally:
             conn.close()
@@ -67,6 +69,7 @@ def create_app() -> Flask:
         hpb = int(request.form.get("hpb") or "0")
         p = int(request.form.get("p") or "0")
         r = int(request.form.get("r") or "0")
+        continue_add = (request.form.get("continue_add") or "") == "1"
         # シンプル運用: 1回の保存=1件として固定
         quantity = 1
 
@@ -94,6 +97,9 @@ def create_app() -> Flask:
                 (service_date, therapist_id, menu_id, quantity, hpb, p, r, now_iso()),
             )
             flash("Saved / บันทึกแล้ว", "ok")
+            if continue_add:
+                # 同じセラピストで続けてメニューを追加しやすくする
+                return redirect(url_for("kiosk", therapist_id=therapist_id, _anchor="input"))
             return redirect(url_for("kiosk", _anchor="summary"))
         finally:
             conn.close()
