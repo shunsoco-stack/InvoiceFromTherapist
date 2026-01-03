@@ -78,11 +78,14 @@
                 {% endif %}
               </td>
               <td class="right">
-                <form method="post" action="{{ url_for('menus_toggle', menu_id=m.id) }}">
-                  <button class="btn btn--secondary" type="submit">
-                    {% if m.is_active %}無効にする{% else %}有効にする{% endif %}
-                  </button>
-                </form>
+                <div class="actions" style="justify-content:flex-end; margin:0;">
+                  <a class="btn btn--secondary" href="{{ url_for('menus_edit', menu_id=m.id) }}">編集</a>
+                  <form method="post" action="{{ url_for('menus_toggle', menu_id=m.id) }}">
+                    <button class="btn btn--secondary" type="submit">
+                      {% if m.is_active %}無効{% else %}有効{% endif %}
+                    </button>
+                  </form>
+                </div>
               </td>
             </tr>
           {% endfor %}

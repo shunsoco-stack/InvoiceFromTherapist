@@ -205,6 +205,60 @@ def create_app() -> Flask:
         finally:
             conn.close()
 
+    @app.get("/menus/<int:menu_id>/edit")
+    def menus_edit(menu_id: int):
+        conn = connect()
+        try:
+            m = q1(conn, "SELECT * FROM menus WHERE id = ?", (menu_id,))
+            if not m:
+                flash("対象のメニューが見つかりません。", "error")
+                return redirect(url_for("menus_list"))
+            return render_template("menus_edit.html", menu=m)
+        finally:
+            conn.close()
+
+    @app.post("/menus/<int:menu_id>/edit")
+    def menus_edit_post(menu_id: int):
+        name = (request.form.get("name") or "").strip()
+        price = int(request.form.get("price") or "0")
+        is_active = 1 if (request.form.get("is_active") == "on") else 0
+
+        commission_type = (request.form.get("commission_type") or "").strip() or None
+        commission_value_raw = (request.form.get("commission_value") or "").strip()
+        commission_value = int(commission_value_raw) if commission_value_raw else None
+
+        if not name:
+            flash("メニュー名は必須です。", "error")
+            return redirect(url_for("menus_edit", menu_id=menu_id))
+        if price < 0:
+            flash("金額が不正です。", "error")
+            return redirect(url_for("menus_edit", menu_id=menu_id))
+        if commission_type is not None and commission_type not in ("percent", "fixed"):
+            flash("歩合タイプが不正です。", "error")
+            return redirect(url_for("menus_edit", menu_id=menu_id))
+        if commission_type is None:
+            commission_value = None
+
+        conn = connect()
+        try:
+            m = q1(conn, "SELECT id FROM menus WHERE id = ?", (menu_id,))
+            if not m:
+                flash("対象のメニューが見つかりません。", "error")
+                return redirect(url_for("menus_list"))
+            conn.execute(
+                """
+                UPDATE menus
+                SET name = ?, price = ?, commission_type = ?, commission_value = ?, is_active = ?
+                WHERE id = ?
+                """,
+                (name, price, commission_type, commission_value, is_active, menu_id),
+            )
+            conn.commit()
+            flash("メニューを更新しました。", "ok")
+            return redirect(url_for("menus_list"))
+        finally:
+            conn.close()
+
     @app.post("/menus/new")
     def menus_new():
         name = (request.form.get("name") or "").strip()
