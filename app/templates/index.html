@@ -2,6 +2,11 @@
 {% set title = "トップ" %}
 {% block content %}
   <div class="homeSimple">
+    {% if logo_url %}
+      <div class="homeSimple__logoWrap">
+        <img class="homeSimple__logo" src="{{ logo_url }}" alt="{{ logo_alt }}" />
+      </div>
+    {% endif %}
     <div class="homeSimple__title mono">{{ today }}</div>
     <div class="homeSimple__buttons">
       <a class="btn homeSimple__btn homeSimple__btn--primary" href="{{ url_for('kiosk') }}">施術入力 / บันทึก</a>

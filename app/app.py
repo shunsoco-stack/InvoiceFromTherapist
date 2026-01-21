@@ -17,10 +17,27 @@ def create_app() -> Flask:
 
     init_db()
 
+    def _find_logo_filename() -> Optional[str]:
+        static_dir = app.static_folder or ""
+        env_filename = (os.getenv("SALON_LOGO_FILENAME") or "").strip()
+        candidates = []
+        if env_filename:
+            candidates.append(env_filename)
+        candidates.extend(["logo.svg", "logo.png", "logo.webp", "logo.jpg", "logo.jpeg"])
+        for name in candidates:
+            if not name:
+                continue
+            if os.path.exists(os.path.join(static_dir, name)):
+                return name
+        return None
+
     @app.get("/")
     def index():
         today = date.today().isoformat()
-        return render_template("index.html", today=today)
+        logo_filename = _find_logo_filename()
+        logo_url = url_for("static", filename=logo_filename) if logo_filename else None
+        logo_alt = (os.getenv("SALON_LOGO_ALT") or "ロゴ").strip() or "ロゴ"
+        return render_template("index.html", today=today, logo_url=logo_url, logo_alt=logo_alt)
 
     @app.get("/admin")
     def admin():

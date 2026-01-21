@@ -172,6 +172,17 @@ input::placeholder{ color: rgba(169,180,202,.7); }
   gap: 14px;
   padding: 12px 0 24px;
 }
+.homeSimple__logoWrap{
+  display:flex;
+  align-items:center;
+  justify-content:center;
+}
+.homeSimple__logo{
+  max-width: min(280px, 72vw);
+  max-height: 140px;
+  height: auto;
+  object-fit: contain;
+}
 .homeSimple__title{ color: var(--muted); font-size: 16px; }
 .homeSimple__buttons{
   display:flex;
