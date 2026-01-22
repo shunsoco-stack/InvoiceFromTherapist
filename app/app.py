@@ -39,6 +39,14 @@ def create_app() -> Flask:
         logo_alt = (os.getenv("SALON_LOGO_ALT") or "ロゴ").strip() or "ロゴ"
         return render_template("index.html", today=today, logo_url=logo_url, logo_alt=logo_alt)
 
+    @app.get("/lp")
+    @app.get("/landing")
+    def landing():
+        logo_filename = _find_logo_filename()
+        logo_url = url_for("static", filename=logo_filename) if logo_filename else None
+        logo_alt = (os.getenv("SALON_LOGO_ALT") or "ロゴ").strip() or "ロゴ"
+        return render_template("landing.html", logo_url=logo_url, logo_alt=logo_alt)
+
     @app.get("/admin")
     def admin():
         today = date.today().isoformat()

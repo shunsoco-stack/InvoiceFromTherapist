@@ -374,3 +374,201 @@ input::placeholder{ color: rgba(169,180,202,.7); }
   border-radius: 14px;
 }
 
+/* Landing page */
+.landing{
+  display:flex;
+  flex-direction: column;
+  gap: 26px;
+}
+.lp-hero{
+  position: relative;
+  overflow: hidden;
+  border-radius: 26px;
+  padding: 28px;
+  color: #f7f1e7;
+  background:
+    radial-gradient(circle at 12% 18%, rgba(243,208,140,.28), rgba(243,208,140,0) 55%),
+    linear-gradient(135deg, #0f0f16, #241a2d);
+  border: 1px solid rgba(255,255,255,.10);
+  box-shadow: var(--shadow);
+}
+.lp-hero__inner{
+  position: relative;
+  z-index: 1;
+  display:flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.lp-hero__logoWrap{
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  padding: 6px 12px;
+  border-radius: 12px;
+  border: 1px solid rgba(255,255,255,.16);
+  background: rgba(255,255,255,.08);
+  width: fit-content;
+}
+.lp-hero__logo{
+  display:block;
+  max-height: 48px;
+  width: auto;
+}
+.lp-hero__eyebrow{
+  margin: 0;
+  text-transform: uppercase;
+  letter-spacing: .18em;
+  font-size: 11px;
+  color: rgba(246,226,196,.85);
+}
+.lp-hero__title{
+  margin: 0;
+  font-size: 32px;
+  line-height: 1.25;
+}
+.lp-hero__subtitle{
+  margin: 0;
+  font-size: 15px;
+  color: rgba(245,236,220,.88);
+  max-width: 680px;
+}
+.lp-hero__actions{
+  display:flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 8px;
+}
+.lp-cta.btn{
+  background: linear-gradient(135deg, #f2d08a, #c8a058);
+  border: 1px solid rgba(255,255,255,.25);
+  color: #2b2b3a;
+}
+.lp-cta.btn:hover{ filter: brightness(1.04); }
+.lp-cta--ghost.btn{
+  background: rgba(255,255,255,.08);
+  color: #f7f1e7;
+  border-color: rgba(255,255,255,.18);
+}
+.lp-hero__badges{
+  display:flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 10px;
+}
+.lp-badge{
+  font-size: 12px;
+  padding: 4px 10px;
+  border-radius: 999px;
+  border: 1px solid rgba(255,255,255,.20);
+  color: rgba(248,240,222,.92);
+  background: rgba(255,255,255,.06);
+}
+.lp-section{
+  background: rgba(255,255,255,.92);
+  border: 1px solid rgba(241,198,220,.95);
+  border-radius: 22px;
+  padding: 22px;
+  box-shadow: var(--shadow2);
+}
+.lp-section__head{
+  display:flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-bottom: 16px;
+}
+.lp-eyebrow{
+  margin: 0;
+  text-transform: uppercase;
+  letter-spacing: .18em;
+  font-size: 11px;
+  color: var(--muted);
+}
+.lp-grid{
+  display:grid;
+  grid-template-columns: 1fr;
+  gap: 12px;
+}
+.lp-grid--2{ grid-template-columns: 1fr; }
+.lp-grid--3{ grid-template-columns: 1fr; }
+@media (min-width: 780px){
+  .lp-grid--2{ grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@media (min-width: 980px){
+  .lp-grid--3{ grid-template-columns: repeat(3, minmax(0, 1fr)); }
+}
+.lp-card{
+  background: #ffffff;
+  border: 1px solid rgba(15,15,22,.06);
+  border-radius: 18px;
+  padding: 14px;
+  box-shadow: var(--shadow2);
+}
+.lp-card h3{ margin: 0 0 6px; font-size: 16px; }
+.lp-card p{ margin: 0; }
+.lp-steps{
+  display:grid;
+  gap: 12px;
+}
+.lp-step{
+  display:flex;
+  gap: 12px;
+  align-items:flex-start;
+  background: #ffffff;
+  border: 1px solid rgba(15,15,22,.06);
+  border-radius: 18px;
+  padding: 14px;
+  box-shadow: var(--shadow2);
+}
+.lp-step__index{
+  width: 34px;
+  height: 34px;
+  border-radius: 10px;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  font-weight: 700;
+  color: #7a5a24;
+  background: rgba(240,208,140,.24);
+}
+.lp-step__body h3{ margin: 0 0 4px; font-size: 16px; }
+.lp-step__body p{ margin: 0; color: var(--muted); }
+.lp-faq{
+  display:grid;
+  gap: 12px;
+}
+.lp-faq__item{
+  background: #ffffff;
+  border: 1px solid rgba(15,15,22,.06);
+  border-radius: 18px;
+  padding: 14px;
+  box-shadow: var(--shadow2);
+}
+.lp-faq__q{
+  margin: 0 0 6px;
+  font-weight: 700;
+}
+.lp-faq__a{
+  margin: 0;
+  color: var(--muted);
+}
+.lp-ctaPanel{
+  border-radius: 24px;
+  padding: 24px;
+  color: #f7f1e7;
+  background: linear-gradient(135deg, #191725, #2b2234);
+  border: 1px solid rgba(255,255,255,.12);
+  box-shadow: var(--shadow);
+}
+.lp-ctaPanel__inner{
+  display:flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.lp-ctaPanel__actions{
+  display:flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 8px;
+}
+.lp-eyebrow--light{ color: rgba(246,226,196,.85); }
+

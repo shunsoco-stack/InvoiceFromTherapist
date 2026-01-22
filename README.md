@@ -29,6 +29,8 @@ python run.py
 
 セラピスト向けの簡単画面は `http://localhost:5000/kiosk` です。
 
+ランディングページは `http://localhost:5000/lp` です。
+
 ## ロゴの表示（トップ画面）
 
 トップ画面にロゴを表示したい場合は、`app/static/` に画像を置いてください。
