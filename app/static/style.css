@@ -405,6 +405,18 @@ input::placeholder{ color: rgba(169,180,202,.7); }
   flex-direction: column;
   gap: 26px;
 }
+.landing[data-lang="jp"] .lang-th,
+.landing[data-lang="jp"] .lp-heading__th,
+.landing[data-lang="jp"] .lp-textPair__th,
+.landing[data-lang="jp"] .lp-caption__th{
+  display: none;
+}
+.landing[data-lang="th"] .lang-jp,
+.landing[data-lang="th"] .lp-heading__jp,
+.landing[data-lang="th"] .lp-textPair__jp,
+.landing[data-lang="th"] .lp-caption__jp{
+  display: none;
+}
 .lp-heading{
   margin: 0;
   display:flex;
@@ -444,6 +456,44 @@ input::placeholder{ color: rgba(169,180,202,.7); }
   display:flex;
   flex-direction: column;
   gap: 12px;
+}
+.lp-hero__utility{
+  display:flex;
+  justify-content: flex-end;
+  align-items:center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+.lp-hero__utilityLabel{
+  font-size: 12px;
+  color: rgba(245,236,220,.8);
+}
+.lp-langToggle{
+  display:inline-flex;
+  align-items:center;
+  gap: 6px;
+  padding: 6px 12px;
+  border-radius: 999px;
+  border: 1px solid rgba(255,255,255,.25);
+  background: rgba(255,255,255,.10);
+  color: #f7f1e7;
+  cursor: pointer;
+  font-size: 12px;
+  font-family: inherit;
+}
+.lp-langToggle:hover{
+  background: rgba(255,255,255,.16);
+}
+.lp-langToggle__item{
+  opacity: .6;
+}
+.lp-langToggle[data-lang="jp"] .lp-langToggle__item[data-lang="jp"],
+.lp-langToggle[data-lang="th"] .lp-langToggle__item[data-lang="th"]{
+  opacity: 1;
+  color: #f2d08a;
+}
+.lp-langToggle__divider{
+  opacity: .4;
 }
 .lp-hero__layout{
   display:grid;
