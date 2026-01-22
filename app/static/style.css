@@ -25,6 +25,31 @@ body{
   background-size: 72px 72px, 96px 96px, auto;
   color: var(--text);
 }
+body.body--landing{
+  background:
+    radial-gradient(circle at 12% 18%, rgba(243,208,140,.14), rgba(243,208,140,0) 60%),
+    radial-gradient(circle at 88% 6%, rgba(110,92,150,.22), rgba(110,92,150,0) 50%),
+    radial-gradient(circle at 20% 92%, rgba(255,255,255,.12), rgba(255,255,255,0) 45%),
+    linear-gradient(180deg, #0f0f16 0%, #171724 45%, #1f1b2a 100%);
+  background-attachment: fixed;
+}
+body.body--landing .header{
+  background: rgba(13,12,18,.75);
+  border-bottom: 1px solid rgba(255,255,255,.12);
+}
+body.body--landing .brand a{
+  color: #f7f1e7;
+}
+body.body--landing .brand a::before{
+  box-shadow: 0 0 0 4px rgba(242,208,138,.18);
+}
+body.body--landing .footer{
+  border-top: 1px solid rgba(255,255,255,.12);
+  background: rgba(12,12,18,.75);
+}
+body.body--landing .footer .muted{
+  color: rgba(247,241,231,.78);
+}
 a{ color: var(--text); text-decoration:none; }
 a:hover{ text-decoration:underline; }
 
