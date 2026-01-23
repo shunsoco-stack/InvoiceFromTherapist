@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="640" height="420" viewBox="0 0 640 420" role="img" aria-label="Gallery visual">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#2a2433"/>
+      <stop offset="100%" stop-color="#5a3768"/>
+    </linearGradient>
+    <radialGradient id="glow" cx="0.25" cy="0.2" r="0.8">
+      <stop offset="0%" stop-color="#d6b4ff" stop-opacity="0.5"/>
+      <stop offset="100%" stop-color="#d6b4ff" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+  <rect width="640" height="420" rx="32" fill="url(#bg)"/>
+  <rect width="640" height="420" rx="32" fill="url(#glow)"/>
+  <rect x="70" y="70" width="500" height="110" rx="18" fill="#1d1623" fill-opacity="0.75" stroke="#d6b4ff" stroke-opacity="0.35"/>
+  <rect x="100" y="98" width="160" height="12" rx="6" fill="#ffffff" fill-opacity="0.2"/>
+  <rect x="280" y="98" width="120" height="12" rx="6" fill="#ffffff" fill-opacity="0.12"/>
+  <rect x="70" y="210" width="240" height="140" rx="20" fill="#ffffff" fill-opacity="0.08"/>
+  <rect x="340" y="210" width="230" height="140" rx="20" fill="#ffffff" fill-opacity="0.12"/>
+</svg>

@@ -62,33 +62,17 @@
           </div>
           <div class="lp-hero__media">
             <div class="lp-media lp-media--hero lp-media--midnight">
-              <svg class="lp-media__icon lp-media__icon--lg" viewBox="0 0 64 64" aria-hidden="true">
-                <rect x="10" y="14" width="44" height="36" rx="8"></rect>
-                <circle cx="26" cy="30" r="4"></circle>
-                <path d="M16 44l12-12 8 8 8-10 12 14"></path>
-              </svg>
+              <img class="lp-media__img" src="{{ url_for('static', filename='lp/hero-main.svg') }}" alt="Salon visual" />
             </div>
             <div class="lp-mediaRow">
               <div class="lp-media lp-media--mini lp-media--gold">
-                <svg class="lp-media__icon" viewBox="0 0 64 64" aria-hidden="true">
-                  <rect x="10" y="14" width="44" height="36" rx="8"></rect>
-                  <path d="M22 42V30M32 42V24M42 42V34"></path>
-                  <path d="M18 26H46"></path>
-                </svg>
+                <img class="lp-media__img" src="{{ url_for('static', filename='lp/hero-mini-1.svg') }}" alt="Salon visual detail" />
               </div>
               <div class="lp-media lp-media--mini lp-media--rose">
-                <svg class="lp-media__icon" viewBox="0 0 64 64" aria-hidden="true">
-                  <rect x="10" y="14" width="44" height="36" rx="8"></rect>
-                  <path d="M20 32l6 6 10-12"></path>
-                  <path d="M20 40l6 6 10-12"></path>
-                </svg>
+                <img class="lp-media__img" src="{{ url_for('static', filename='lp/hero-mini-2.svg') }}" alt="Salon visual detail" />
               </div>
               <div class="lp-media lp-media--mini lp-media--jade">
-                <svg class="lp-media__icon" viewBox="0 0 64 64" aria-hidden="true">
-                  <rect x="10" y="14" width="44" height="36" rx="8"></rect>
-                  <circle cx="32" cy="32" r="9"></circle>
-                  <path d="M32 23v18M23 32h18"></path>
-                </svg>
+                <img class="lp-media__img" src="{{ url_for('static', filename='lp/hero-mini-3.svg') }}" alt="Salon visual detail" />
               </div>
             </div>
           </div>
@@ -303,11 +287,7 @@
       <div class="lp-mediaGrid">
         <figure class="lp-mediaCard">
           <div class="lp-media lp-media--gallery lp-media--amber">
-            <svg class="lp-media__icon" viewBox="0 0 64 64" aria-hidden="true">
-              <rect x="10" y="14" width="44" height="36" rx="8"></rect>
-              <circle cx="26" cy="30" r="4"></circle>
-              <path d="M16 44l12-12 8 8 8-10 12 14"></path>
-            </svg>
+            <img class="lp-media__img" src="{{ url_for('static', filename='lp/gallery-1.svg') }}" alt="Gallery visual" loading="lazy" />
           </div>
           <figcaption class="lp-mediaCard__caption">
             <span class="lp-caption__jp">受付・会計</span>
@@ -316,11 +296,7 @@
         </figure>
         <figure class="lp-mediaCard">
           <div class="lp-media lp-media--gallery lp-media--rose">
-            <svg class="lp-media__icon" viewBox="0 0 64 64" aria-hidden="true">
-              <rect x="10" y="14" width="44" height="36" rx="8"></rect>
-              <path d="M20 32l6 6 10-12"></path>
-              <path d="M20 40l6 6 10-12"></path>
-            </svg>
+            <img class="lp-media__img" src="{{ url_for('static', filename='lp/gallery-2.svg') }}" alt="Gallery visual" loading="lazy" />
           </div>
           <figcaption class="lp-mediaCard__caption">
             <span class="lp-caption__jp">施術記録</span>
@@ -329,11 +305,7 @@
         </figure>
         <figure class="lp-mediaCard">
           <div class="lp-media lp-media--gallery lp-media--gold">
-            <svg class="lp-media__icon" viewBox="0 0 64 64" aria-hidden="true">
-              <rect x="10" y="14" width="44" height="36" rx="8"></rect>
-              <path d="M22 42V30M32 42V24M42 42V34"></path>
-              <path d="M18 26H46"></path>
-            </svg>
+            <img class="lp-media__img" src="{{ url_for('static', filename='lp/gallery-3.svg') }}" alt="Gallery visual" loading="lazy" />
           </div>
           <figcaption class="lp-mediaCard__caption">
             <span class="lp-caption__jp">日次レポート</span>
@@ -342,11 +314,7 @@
         </figure>
         <figure class="lp-mediaCard">
           <div class="lp-media lp-media--gallery lp-media--jade">
-            <svg class="lp-media__icon" viewBox="0 0 64 64" aria-hidden="true">
-              <rect x="10" y="14" width="44" height="36" rx="8"></rect>
-              <circle cx="32" cy="32" r="9"></circle>
-              <path d="M32 23v18M23 32h18"></path>
-            </svg>
+            <img class="lp-media__img" src="{{ url_for('static', filename='lp/gallery-4.svg') }}" alt="Gallery visual" loading="lazy" />
           </div>
           <figcaption class="lp-mediaCard__caption">
             <span class="lp-caption__jp">スタッフ入力</span>
@@ -355,10 +323,7 @@
         </figure>
         <figure class="lp-mediaCard">
           <div class="lp-media lp-media--gallery lp-media--sky">
-            <svg class="lp-media__icon" viewBox="0 0 64 64" aria-hidden="true">
-              <rect x="10" y="14" width="44" height="36" rx="8"></rect>
-              <path d="M20 26h24M20 34h18M20 42h22"></path>
-            </svg>
+            <img class="lp-media__img" src="{{ url_for('static', filename='lp/gallery-5.svg') }}" alt="Gallery visual" loading="lazy" />
           </div>
           <figcaption class="lp-mediaCard__caption">
             <span class="lp-caption__jp">メニュー管理</span>
@@ -367,11 +332,7 @@
         </figure>
         <figure class="lp-mediaCard">
           <div class="lp-media lp-media--gallery lp-media--pearl">
-            <svg class="lp-media__icon" viewBox="0 0 64 64" aria-hidden="true">
-              <rect x="10" y="14" width="44" height="36" rx="8"></rect>
-              <path d="M24 28a8 8 0 0 0 16 0"></path>
-              <path d="M20 44c3-6 21-6 24 0"></path>
-            </svg>
+            <img class="lp-media__img" src="{{ url_for('static', filename='lp/gallery-6.svg') }}" alt="Gallery visual" loading="lazy" />
           </div>
           <figcaption class="lp-mediaCard__caption">
             <span class="lp-caption__jp">セラピスト管理</span>
@@ -380,10 +341,7 @@
         </figure>
         <figure class="lp-mediaCard">
           <div class="lp-media lp-media--gallery lp-media--plum">
-            <svg class="lp-media__icon" viewBox="0 0 64 64" aria-hidden="true">
-              <rect x="10" y="14" width="44" height="36" rx="8"></rect>
-              <path d="M22 24h20M22 32h20M22 40h20"></path>
-            </svg>
+            <img class="lp-media__img" src="{{ url_for('static', filename='lp/gallery-7.svg') }}" alt="Gallery visual" loading="lazy" />
           </div>
           <figcaption class="lp-mediaCard__caption">
             <span class="lp-caption__jp">CSV出力</span>
@@ -392,11 +350,7 @@
         </figure>
         <figure class="lp-mediaCard">
           <div class="lp-media lp-media--gallery lp-media--midnight">
-            <svg class="lp-media__icon" viewBox="0 0 64 64" aria-hidden="true">
-              <rect x="10" y="14" width="44" height="36" rx="8"></rect>
-              <path d="M22 42V30M32 42V24M42 42V34"></path>
-              <path d="M18 26H46"></path>
-            </svg>
+            <img class="lp-media__img" src="{{ url_for('static', filename='lp/gallery-8.svg') }}" alt="Gallery visual" loading="lazy" />
           </div>
           <figcaption class="lp-mediaCard__caption">
             <span class="lp-caption__jp">日払い精算</span>
@@ -460,51 +414,6 @@
               <span class="lp-textPair__th">ตรวจสอบยอดขายและยอดจ่ายให้เสร็จในรายงานรายวัน</span>
             </p>
           </div>
-        </div>
-      </div>
-    </section>
-
-    <section class="lp-section">
-      <div class="lp-section__head">
-        <p class="lp-eyebrow">
-          <span class="lang-jp">FAQ</span>
-          <span class="lang-th">คำถาม</span>
-        </p>
-        <h2 class="lp-heading">
-          <span class="lp-heading__jp">よくある質問</span>
-          <span class="lp-heading__th">คำถามที่พบบ่อย</span>
-        </h2>
-      </div>
-      <div class="lp-faq">
-        <div class="lp-faq__item">
-          <p class="lp-faq__q lp-textPair">
-            <span class="lp-textPair__jp">Q. データはどこに保存されますか？</span>
-            <span class="lp-textPair__th">Q. ข้อมูลถูกเก็บไว้ที่ไหน?</span>
-          </p>
-          <p class="lp-faq__a lp-textPair">
-            <span class="lp-textPair__jp">A. ローカルPC内のSQLiteファイルに保存されます。外部にデータは送信しません。</span>
-            <span class="lp-textPair__th">A. เก็บไว้ในไฟล์ SQLite บนเครื่อง ไม่ส่งข้อมูลออกภายนอก</span>
-          </p>
-        </div>
-        <div class="lp-faq__item">
-          <p class="lp-faq__q lp-textPair">
-            <span class="lp-textPair__jp">Q. バックアップはできますか？</span>
-            <span class="lp-textPair__th">Q. สำรองข้อมูลได้ไหม?</span>
-          </p>
-          <p class="lp-faq__a lp-textPair">
-            <span class="lp-textPair__jp">A. データ保存フォルダをコピーするだけでバックアップできます。</span>
-            <span class="lp-textPair__th">A. คัดลอกโฟลเดอร์ข้อมูลเพื่อสำรองได้</span>
-          </p>
-        </div>
-        <div class="lp-faq__item">
-          <p class="lp-faq__q lp-textPair">
-            <span class="lp-textPair__jp">Q. インターネットがなくても使えますか？</span>
-            <span class="lp-textPair__th">Q. ใช้งานได้แม้ไม่มีอินเทอร์เน็ตไหม?</span>
-          </p>
-          <p class="lp-faq__a lp-textPair">
-            <span class="lp-textPair__jp">A. ローカル運用のため、基本的にインターネット接続なしでも利用できます。</span>
-            <span class="lp-textPair__th">A. ใช้งานแบบโลคัล จึงใช้ได้แม้ไม่มีอินเทอร์เน็ต</span>
-          </p>
         </div>
       </div>
     </section>

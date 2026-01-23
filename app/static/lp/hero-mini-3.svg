@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="360" height="240" viewBox="0 0 360 240" role="img" aria-label="Salon detail visual">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#192827"/>
+      <stop offset="100%" stop-color="#2e5a4a"/>
+    </linearGradient>
+    <radialGradient id="glow" cx="0.3" cy="0.2" r="0.8">
+      <stop offset="0%" stop-color="#b7f0d7" stop-opacity="0.55"/>
+      <stop offset="100%" stop-color="#b7f0d7" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+  <rect width="360" height="240" rx="28" fill="url(#bg)"/>
+  <rect width="360" height="240" rx="28" fill="url(#glow)"/>
+  <rect x="36" y="46" width="288" height="64" rx="16" fill="#0f1c1a" fill-opacity="0.8" stroke="#b7f0d7" stroke-opacity="0.35"/>
+  <rect x="56" y="68" width="110" height="10" rx="5" fill="#ffffff" fill-opacity="0.25"/>
+  <rect x="190" y="68" width="90" height="10" rx="5" fill="#ffffff" fill-opacity="0.15"/>
+  <rect x="36" y="130" width="140" height="70" rx="16" fill="#ffffff" fill-opacity="0.08"/>
+  <rect x="200" y="130" width="124" height="70" rx="16" fill="#ffffff" fill-opacity="0.12"/>
+</svg>
