@@ -1,4 +1,4 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="360" height="240" viewBox="0 0 360 240" role="img" aria-label="Salon detail visual">
+<svg xmlns="http://www.w3.org/2000/svg" width="360" height="240" viewBox="0 0 360 240" role="img" aria-label="Staff illustration">
   <defs>
     <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
       <stop offset="0%" stop-color="#192827"/>
@@ -11,9 +11,11 @@
   </defs>
   <rect width="360" height="240" rx="28" fill="url(#bg)"/>
   <rect width="360" height="240" rx="28" fill="url(#glow)"/>
-  <rect x="36" y="46" width="288" height="64" rx="16" fill="#0f1c1a" fill-opacity="0.8" stroke="#b7f0d7" stroke-opacity="0.35"/>
-  <rect x="56" y="68" width="110" height="10" rx="5" fill="#ffffff" fill-opacity="0.25"/>
-  <rect x="190" y="68" width="90" height="10" rx="5" fill="#ffffff" fill-opacity="0.15"/>
-  <rect x="36" y="130" width="140" height="70" rx="16" fill="#ffffff" fill-opacity="0.08"/>
-  <rect x="200" y="130" width="124" height="70" rx="16" fill="#ffffff" fill-opacity="0.12"/>
+  <rect x="48" y="38" width="264" height="164" rx="22" fill="#111f1c" fill-opacity="0.78" stroke="#b7f0d7" stroke-opacity="0.4"/>
+  <circle cx="140" cy="92" r="26" fill="#b7f0d7" fill-opacity="0.7"/>
+  <path d="M110 122h60c16 0 28 12 28 28v18h-116v-18c0-16 12-28 28-28z" fill="#b7f0d7" fill-opacity="0.3"/>
+  <rect x="196" y="70" width="90" height="12" rx="6" fill="#ffffff" fill-opacity="0.25"/>
+  <rect x="196" y="92" width="70" height="10" rx="5" fill="#ffffff" fill-opacity="0.18"/>
+  <rect x="196" y="114" width="110" height="10" rx="5" fill="#ffffff" fill-opacity="0.12"/>
+  <path d="M250 150l6 12 14 2-10 10 2 14-12-6-12 6 2-14-10-10 14-2z" fill="#f2d08a" fill-opacity="0.7"/>
 </svg>
