@@ -50,6 +50,51 @@
             }
           });
         });
+
+        const formatDate = (date) => {
+          const yyyy = date.getFullYear();
+          const mm = String(date.getMonth() + 1).padStart(2, "0");
+          const dd = String(date.getDate()).padStart(2, "0");
+          return `${yyyy}-${mm}-${dd}`;
+        };
+
+        const parseDateValue = (value) => {
+          const parts = value.split("-").map((v) => Number(v));
+          if (parts.length !== 3 || parts.some((v) => Number.isNaN(v))) {
+            return null;
+          }
+          const [year, month, day] = parts;
+          return new Date(year, month - 1, day);
+        };
+
+        const shiftButtons = document.querySelectorAll("[data-date-shift]");
+        shiftButtons.forEach((button) => {
+          button.addEventListener("click", () => {
+            const form = button.closest("form");
+            if (!form) {
+              return;
+            }
+            const input = form.querySelector('input[type="date"]');
+            if (!input) {
+              return;
+            }
+            const shift = Number(button.dataset.dateShift || "0");
+            if (Number.isNaN(shift) || shift === 0) {
+              return;
+            }
+            const baseDate = input.value ? parseDateValue(input.value) : new Date();
+            if (!baseDate) {
+              return;
+            }
+            baseDate.setDate(baseDate.getDate() + shift);
+            input.value = formatDate(baseDate);
+            if (form.requestSubmit) {
+              form.requestSubmit();
+            } else {
+              form.submit();
+            }
+          });
+        });
       })();
     </script>
   </body>
