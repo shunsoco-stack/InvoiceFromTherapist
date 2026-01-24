@@ -29,5 +29,13 @@
       <a class="btn btn--secondary" href="{{ url_for('index') }}">トップへ戻る / กลับ</a>
     </div>
   </section>
+
+  <section class="card">
+    <h2>CSV出力</h2>
+    <p class="muted">支払済みの記録からCSVを出力します。</p>
+    <div class="actions">
+      <a class="btn" href="{{ url_for('report_payouts_csv') }}">支払CSV / การจ่าย</a>
+    </div>
+  </section>
 {% endblock %}
 

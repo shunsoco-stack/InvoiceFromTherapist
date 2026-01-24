@@ -875,6 +875,52 @@ def create_app() -> Flask:
         finally:
             conn.close()
 
+    @app.get("/reports/payouts.csv")
+    def report_payouts_csv():
+        conn = connect()
+        try:
+            rows = q(
+                conn,
+                """
+                SELECT
+                  p.service_date,
+                  p.therapist_id,
+                  th.name AS therapist_name,
+                  p.paid_amount,
+                  p.paid_at,
+                  p.method,
+                  p.notes
+                FROM payouts p
+                JOIN therapists th ON th.id = p.therapist_id
+                ORDER BY p.service_date DESC, th.name ASC, p.id ASC
+                """,
+            )
+            output = io.StringIO()
+            w = csv.writer(output)
+            w.writerow(["日付", "セラピスト", "支払額(円)", "支払日時", "支払方法", "メモ"])
+            for r in rows:
+                w.writerow(
+                    [
+                        r["service_date"],
+                        r["therapist_name"],
+                        r["paid_amount"],
+                        r["paid_at"],
+                        r["method"] or "",
+                        r["notes"] or "",
+                    ]
+                )
+
+            bom = "\ufeff"
+            csv_bytes = (bom + output.getvalue()).encode("utf-8")
+            filename = "payouts.csv"
+            return Response(
+                csv_bytes,
+                mimetype="text/csv; charset=utf-8",
+                headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+            )
+        finally:
+            conn.close()
+
     @app.post("/payouts/mark_paid")
     def payout_mark_paid():
         service_date = (request.form.get("service_date") or date.today().isoformat()).strip()
