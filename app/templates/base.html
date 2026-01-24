@@ -34,6 +34,24 @@
         <span class="muted">ローカル用の簡易システム（SQLite）</span>
       </div>
     </footer>
+    <script>
+      (() => {
+        const autoInputs = document.querySelectorAll("[data-auto-submit]");
+        autoInputs.forEach((input) => {
+          input.addEventListener("change", () => {
+            const form = input.closest("form");
+            if (!form) {
+              return;
+            }
+            if (form.requestSubmit) {
+              form.requestSubmit();
+            } else {
+              form.submit();
+            }
+          });
+        });
+      })();
+    </script>
   </body>
 </html>
 

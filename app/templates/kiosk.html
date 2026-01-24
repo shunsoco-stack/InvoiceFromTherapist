@@ -25,7 +25,7 @@
       <section class="card kiosk__card">
         <h2>日付 / วันที่</h2>
         <form class="inline" method="get" action="{{ url_for('kiosk') }}">
-          <input class="kiosk__dateInput" name="date" type="date" value="{{ service_date }}" />
+          <input class="kiosk__dateInput" name="date" type="date" value="{{ service_date }}" data-auto-submit />
           <button class="btn btn--secondary kiosk__btn" type="submit">表示 / แสดง</button>
           {% if selected_therapist_id %}
             <input type="hidden" name="therapist_id" value="{{ selected_therapist_id }}" />

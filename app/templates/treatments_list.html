@@ -9,7 +9,7 @@
   <section class="card">
     <h2>日付</h2>
     <form class="inline" method="get" action="{{ url_for('treatments_list') }}">
-      <input name="date" type="date" value="{{ service_date }}" />
+      <input name="date" type="date" value="{{ service_date }}" data-auto-submit />
       <button class="btn btn--secondary" type="submit">表示</button>
       <a class="btn btn--secondary" href="{{ url_for('report_daily', date=service_date) }}">この日のレポート</a>
     </form>
