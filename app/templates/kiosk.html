@@ -44,7 +44,12 @@
             <select id="therapistSelect" class="kioskSelect" name="therapist_id" required>
               <option value="" selected disabled>เลือกพนักงาน</option>
               {% for t in therapists %}
-                <option value="{{ t.id }}" {% if t.id == selected_therapist_id %}selected{% endif %}>{{ t.name }}</option>
+                <option value="{{ t.id }}"
+                        data-commission-type="{{ t.commission_type }}"
+                        data-commission-value="{{ t.commission_value }}"
+                        {% if t.id == selected_therapist_id %}selected{% endif %}>
+                  {{ t.name }}
+                </option>
               {% endfor %}
             </select>
           </div>
@@ -54,7 +59,12 @@
             <select id="menuSelect1" class="kioskSelect" name="menu_id_1" required disabled>
               <option value="" selected disabled>เลือกเมนู</option>
               {% for m in menus %}
-                <option value="{{ m.id }}">{{ m.name }}</option>
+                <option value="{{ m.id }}"
+                        data-price="{{ m.price }}"
+                        data-commission-type="{{ m.commission_type or '' }}"
+                        data-commission-value="{{ m.commission_value if m.commission_value is not none else '' }}">
+                  {{ m.name }}
+                </option>
               {% endfor %}
             </select>
           </div>
@@ -62,14 +72,40 @@
           <div id="menuRow2" class="kioskRow kioskRow--hidden">
             <div class="kioskLabel">3) メニュー②（任意） / เมนู 2 (ไม่บังคับ)</div>
             <select id="menuSelect2" class="kioskSelect" name="menu_id_2" disabled>
-              <option value="0" selected>なし / ไม่มี</option>
+              <option value="0" selected data-price="0" data-commission-type="" data-commission-value="">なし / ไม่มี</option>
               {% for m in menus %}
-                <option value="{{ m.id }}">{{ m.name }}</option>
+                <option value="{{ m.id }}"
+                        data-price="{{ m.price }}"
+                        data-commission-type="{{ m.commission_type or '' }}"
+                        data-commission-value="{{ m.commission_value if m.commission_value is not none else '' }}">
+                  {{ m.name }}
+                </option>
               {% endfor %}
             </select>
           </div>
 
           <div id="actionsRow" class="actions kiosk__actions kioskRow--hidden">
+            <div class="kioskEstimate" id="kioskEstimate">
+              <div class="kioskEstimate__title">見積 / ประมาณ</div>
+              <div class="kioskEstimate__grid">
+                <div class="kioskEstimate__label">メニュー① / เมนู 1</div>
+                <div class="kioskEstimate__value" id="estimateMenu1">-</div>
+                <div class="kioskEstimate__label">スタッフ / พนักงาน</div>
+                <div class="kioskEstimate__value" id="estimateStaff1">-</div>
+                <div class="kioskEstimate__label">メニュー② / เมนู 2</div>
+                <div class="kioskEstimate__value" id="estimateMenu2">-</div>
+                <div class="kioskEstimate__label">スタッフ / พนักงาน</div>
+                <div class="kioskEstimate__value" id="estimateStaff2">-</div>
+              </div>
+              <div class="kioskEstimate__divider"></div>
+              <div class="kioskEstimate__grid">
+                <div class="kioskEstimate__label">合計 / รวม</div>
+                <div class="kioskEstimate__value" id="estimateSalesTotal">-</div>
+                <div class="kioskEstimate__label">スタッフ合計 / พนักงานรวม</div>
+                <div class="kioskEstimate__value" id="estimateStaffTotal">-</div>
+              </div>
+              <div class="kioskEstimate__note muted small">※HPB/P/Rも反映</div>
+            </div>
             <div class="kioskInlineFields">
               <div class="kioskInlineField">
                 <label class="kioskLabel" for="hpb">HPB（割引）/ ส่วนลด</label>
@@ -226,6 +262,127 @@
         const menuSelect1 = document.getElementById('menuSelect1');
         const menuSelect2 = document.getElementById('menuSelect2');
         const actionsRow = document.getElementById('actionsRow');
+        const hpbInput = document.getElementById('hpb');
+        const pInput = document.getElementById('p');
+        const rSelect = document.getElementById('r');
+        const estimateMenu1 = document.getElementById('estimateMenu1');
+        const estimateStaff1 = document.getElementById('estimateStaff1');
+        const estimateMenu2 = document.getElementById('estimateMenu2');
+        const estimateStaff2 = document.getElementById('estimateStaff2');
+        const estimateSalesTotal = document.getElementById('estimateSalesTotal');
+        const estimateStaffTotal = document.getElementById('estimateStaffTotal');
+
+        function formatYen(value) {
+          return `${value.toLocaleString()}円`;
+        }
+
+        function readNumber(value) {
+          const parsed = Number(value);
+          return Number.isFinite(parsed) ? parsed : 0;
+        }
+
+        function pickRule(menuType, menuValue, therapistType, therapistValue) {
+          if (menuType && menuValue !== null) {
+            return { type: menuType, value: menuValue };
+          }
+          if (therapistType && therapistValue !== null) {
+            return { type: therapistType, value: therapistValue };
+          }
+          return { type: 'percent', value: 50 };
+        }
+
+        function calcTreatment(price, rule, hpb, p, r) {
+          const gross = Math.max(0, Math.trunc(price));
+          const discount = Math.max(0, Math.trunc(hpb)) + Math.max(0, Math.trunc(p));
+          const net = Math.max(0, gross - discount);
+          let staffMenu = 0;
+          if (rule.type === 'fixed') {
+            staffMenu = Math.max(0, Math.trunc(rule.value));
+          } else {
+            const pct = Math.max(0, Math.min(100, Math.trunc(rule.value)));
+            staffMenu = Math.floor((net * pct) / 100);
+          }
+          const rFee = Math.max(0, Math.trunc(r));
+          return {
+            sales: net + rFee,
+            staff: staffMenu + rFee,
+          };
+        }
+
+        function getTherapistRule() {
+          const opt = therapistSelect.selectedOptions[0];
+          if (!opt) {
+            return null;
+          }
+          const type = opt.dataset.commissionType || '';
+          const value = opt.dataset.commissionValue === '' ? null : readNumber(opt.dataset.commissionValue);
+          return { type, value };
+        }
+
+        function getMenuData(select) {
+          if (!select || !select.value || select.value === '0') {
+            return null;
+          }
+          const opt = select.selectedOptions[0];
+          if (!opt) {
+            return null;
+          }
+          return {
+            price: readNumber(opt.dataset.price),
+            commissionType: opt.dataset.commissionType || '',
+            commissionValue: opt.dataset.commissionValue === '' ? null : readNumber(opt.dataset.commissionValue),
+          };
+        }
+
+        function resetEstimate() {
+          const placeholders = ['-', '-', '-', '-', '-', '-'];
+          [estimateMenu1, estimateStaff1, estimateMenu2, estimateStaff2, estimateSalesTotal, estimateStaffTotal].forEach(
+            (el, idx) => {
+              if (el) {
+                el.textContent = placeholders[idx];
+              }
+            },
+          );
+        }
+
+        function updateEstimate() {
+          if (!estimateMenu1) {
+            return;
+          }
+          const therapistRule = getTherapistRule();
+          const menu1 = getMenuData(menuSelect1);
+          if (!therapistRule || !menu1) {
+            resetEstimate();
+            return;
+          }
+
+          const hpb = readNumber(hpbInput?.value);
+          const p = readNumber(pInput?.value);
+          const r = readNumber(rSelect?.value);
+          const rule1 = pickRule(menu1.commissionType, menu1.commissionValue, therapistRule.type, therapistRule.value);
+          const result1 = calcTreatment(menu1.price, rule1, hpb, p, r);
+
+          let result2 = null;
+          const menu2 = getMenuData(menuSelect2);
+          if (menu2) {
+            const rule2 = pickRule(menu2.commissionType, menu2.commissionValue, therapistRule.type, therapistRule.value);
+            result2 = calcTreatment(menu2.price, rule2, 0, 0, 0);
+          }
+
+          estimateMenu1.textContent = formatYen(result1.sales);
+          estimateStaff1.textContent = formatYen(result1.staff);
+          if (result2) {
+            estimateMenu2.textContent = formatYen(result2.sales);
+            estimateStaff2.textContent = formatYen(result2.staff);
+          } else {
+            estimateMenu2.textContent = '-';
+            estimateStaff2.textContent = '-';
+          }
+          const totalSales = result1.sales + (result2 ? result2.sales : 0);
+          const totalStaff = result1.staff + (result2 ? result2.staff : 0);
+          estimateSalesTotal.textContent = formatYen(totalSales);
+          estimateStaffTotal.textContent = formatYen(totalStaff);
+        }
 
         function showMenuStep() {
           menuRow.classList.remove('kioskRow--hidden');
@@ -247,14 +404,30 @@
             menuRow2.classList.add('kioskRow--hidden');
             menuSelect2.disabled = true;
             actionsRow.classList.add('kioskRow--hidden');
+            resetEstimate();
           }
         });
 
         menuSelect1.addEventListener('change', () => {
           if (menuSelect1.value) {
             showMenu2AndActions();
+            updateEstimate();
           }
         });
+
+        menuSelect2.addEventListener('change', () => {
+          updateEstimate();
+        });
+
+        if (hpbInput) {
+          hpbInput.addEventListener('input', updateEstimate);
+        }
+        if (pInput) {
+          pInput.addEventListener('input', updateEstimate);
+        }
+        if (rSelect) {
+          rSelect.addEventListener('change', updateEstimate);
+        }
 
         // If therapist is preselected (after "save and continue"), open the next step automatically.
         if (therapistSelect.value) {
