@@ -95,11 +95,11 @@
                   <div class="kioskEstimate__label">スタッフ / พนักงาน</div>
                   <div class="kioskEstimate__value" id="estimateStaff1">-</div>
                 </div>
-                <div class="kioskEstimate__item">
+                <div class="kioskEstimate__item" id="estimateMenu2Item" hidden>
                   <div class="kioskEstimate__label">メニュー② / เมนู 2</div>
                   <div class="kioskEstimate__value" id="estimateMenu2">-</div>
                 </div>
-                <div class="kioskEstimate__item">
+                <div class="kioskEstimate__item" id="estimateStaff2Item" hidden>
                   <div class="kioskEstimate__label">スタッフ / พนักงาน</div>
                   <div class="kioskEstimate__value" id="estimateStaff2">-</div>
                 </div>
@@ -269,6 +269,8 @@
         const estimateStaff1 = document.getElementById('estimateStaff1');
         const estimateMenu2 = document.getElementById('estimateMenu2');
         const estimateStaff2 = document.getElementById('estimateStaff2');
+        const estimateMenu2Item = document.getElementById('estimateMenu2Item');
+        const estimateStaff2Item = document.getElementById('estimateStaff2Item');
 
         function formatYen(value) {
           return `${value.toLocaleString()}円`;
@@ -339,6 +341,12 @@
               el.textContent = placeholders[idx];
             }
           });
+          if (estimateMenu2Item) {
+            estimateMenu2Item.hidden = true;
+          }
+          if (estimateStaff2Item) {
+            estimateStaff2Item.hidden = true;
+          }
         }
 
         function updateEstimate() {
@@ -370,9 +378,21 @@
           if (result2) {
             estimateMenu2.textContent = formatYen(result2.sales);
             estimateStaff2.textContent = formatYen(result2.staff);
+            if (estimateMenu2Item) {
+              estimateMenu2Item.hidden = false;
+            }
+            if (estimateStaff2Item) {
+              estimateStaff2Item.hidden = false;
+            }
           } else {
             estimateMenu2.textContent = '-';
             estimateStaff2.textContent = '-';
+            if (estimateMenu2Item) {
+              estimateMenu2Item.hidden = true;
+            }
+            if (estimateStaff2Item) {
+              estimateStaff2Item.hidden = true;
+            }
           }
         }
 
