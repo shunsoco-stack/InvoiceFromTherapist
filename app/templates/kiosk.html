@@ -86,23 +86,23 @@
 
           <div id="actionsRow" class="actions kiosk__actions kioskRow--hidden">
             <div class="kioskEstimate" id="kioskEstimate">
-              <div class="kioskEstimate__title">見積 / ประมาณ</div>
-              <div class="kioskEstimate__grid">
-                <div class="kioskEstimate__label">メニュー① / เมนู 1</div>
-                <div class="kioskEstimate__value" id="estimateMenu1">-</div>
-                <div class="kioskEstimate__label">スタッフ / พนักงาน</div>
-                <div class="kioskEstimate__value" id="estimateStaff1">-</div>
-                <div class="kioskEstimate__label">メニュー② / เมนู 2</div>
-                <div class="kioskEstimate__value" id="estimateMenu2">-</div>
-                <div class="kioskEstimate__label">スタッフ / พนักงาน</div>
-                <div class="kioskEstimate__value" id="estimateStaff2">-</div>
-              </div>
-              <div class="kioskEstimate__divider"></div>
-              <div class="kioskEstimate__grid">
-                <div class="kioskEstimate__label">合計 / รวม</div>
-                <div class="kioskEstimate__value" id="estimateSalesTotal">-</div>
-                <div class="kioskEstimate__label">スタッフ合計 / พนักงานรวม</div>
-                <div class="kioskEstimate__value" id="estimateStaffTotal">-</div>
+              <div class="kioskEstimate__row">
+                <div class="kioskEstimate__item">
+                  <div class="kioskEstimate__label">メニュー① / เมนู 1</div>
+                  <div class="kioskEstimate__value" id="estimateMenu1">-</div>
+                </div>
+                <div class="kioskEstimate__item">
+                  <div class="kioskEstimate__label">スタッフ / พนักงาน</div>
+                  <div class="kioskEstimate__value" id="estimateStaff1">-</div>
+                </div>
+                <div class="kioskEstimate__item">
+                  <div class="kioskEstimate__label">メニュー② / เมนู 2</div>
+                  <div class="kioskEstimate__value" id="estimateMenu2">-</div>
+                </div>
+                <div class="kioskEstimate__item">
+                  <div class="kioskEstimate__label">スタッフ / พนักงาน</div>
+                  <div class="kioskEstimate__value" id="estimateStaff2">-</div>
+                </div>
               </div>
               <div class="kioskEstimate__note muted small">※HPB/P/Rも反映</div>
             </div>
@@ -269,8 +269,6 @@
         const estimateStaff1 = document.getElementById('estimateStaff1');
         const estimateMenu2 = document.getElementById('estimateMenu2');
         const estimateStaff2 = document.getElementById('estimateStaff2');
-        const estimateSalesTotal = document.getElementById('estimateSalesTotal');
-        const estimateStaffTotal = document.getElementById('estimateStaffTotal');
 
         function formatYen(value) {
           return `${value.toLocaleString()}円`;
@@ -335,14 +333,12 @@
         }
 
         function resetEstimate() {
-          const placeholders = ['-', '-', '-', '-', '-', '-'];
-          [estimateMenu1, estimateStaff1, estimateMenu2, estimateStaff2, estimateSalesTotal, estimateStaffTotal].forEach(
-            (el, idx) => {
-              if (el) {
-                el.textContent = placeholders[idx];
-              }
-            },
-          );
+          const placeholders = ['-', '-', '-', '-'];
+          [estimateMenu1, estimateStaff1, estimateMenu2, estimateStaff2].forEach((el, idx) => {
+            if (el) {
+              el.textContent = placeholders[idx];
+            }
+          });
         }
 
         function updateEstimate() {
@@ -378,10 +374,6 @@
             estimateMenu2.textContent = '-';
             estimateStaff2.textContent = '-';
           }
-          const totalSales = result1.sales + (result2 ? result2.sales : 0);
-          const totalStaff = result1.staff + (result2 ? result2.staff : 0);
-          estimateSalesTotal.textContent = formatYen(totalSales);
-          estimateStaffTotal.textContent = formatYen(totalStaff);
         }
 
         function showMenuStep() {
