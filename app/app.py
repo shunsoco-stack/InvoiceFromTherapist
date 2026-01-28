@@ -69,6 +69,22 @@ def create_app() -> Flask:
             p_totals = _kiosk_p_totals(details)
             r_totals = _kiosk_r_totals(details)
             recent = _kiosk_recent_treatments(conn, service_date)
+            selected_payout = None
+            guarantee_lock = False
+            if selected_therapist_id > 0:
+                payout_row = q1(
+                    conn,
+                    "SELECT * FROM payouts WHERE service_date = ? AND therapist_id = ?",
+                    (service_date, selected_therapist_id),
+                )
+                if payout_row and str(payout_row["method"]) == "最低保証":
+                    selected_payout = payout_row
+                    cnt_row = q1(
+                        conn,
+                        "SELECT COUNT(*) AS cnt FROM treatments WHERE service_date = ? AND therapist_id = ?",
+                        (service_date, selected_therapist_id),
+                    )
+                    guarantee_lock = cnt_row is not None and int(cnt_row["cnt"]) == 0
             return render_template(
                 "kiosk.html",
                 service_date=service_date,
@@ -81,6 +97,8 @@ def create_app() -> Flask:
                 r_totals=r_totals,
                 recent=recent,
                 selected_therapist_id=selected_therapist_id,
+                selected_payout=selected_payout,
+                guarantee_lock=guarantee_lock,
             )
         finally:
             conn.close()
@@ -176,6 +194,35 @@ def create_app() -> Flask:
             conn.commit()
             flash("最低保証を記録しました。", "ok")
             return redirect(url_for("kiosk", date=service_date, therapist_id=therapist_id, _anchor="summary"))
+        finally:
+            conn.close()
+
+    @app.post("/kiosk/guarantee/delete")
+    def kiosk_guarantee_delete():
+        service_date = (request.form.get("service_date") or date.today().isoformat()).strip()
+        therapist_id = int(request.form.get("therapist_id") or "0")
+
+        if therapist_id <= 0:
+            flash("セラピストを選択してください。", "error")
+            return redirect(url_for("kiosk", date=service_date))
+
+        conn = connect()
+        try:
+            row = q1(
+                conn,
+                "SELECT * FROM payouts WHERE service_date = ? AND therapist_id = ?",
+                (service_date, therapist_id),
+            )
+            if not row or str(row["method"]) != "最低保証":
+                flash("最低保証の記録が見つかりません。", "error")
+                return redirect(url_for("kiosk", date=service_date, therapist_id=therapist_id))
+            conn.execute(
+                "DELETE FROM payouts WHERE service_date = ? AND therapist_id = ?",
+                (service_date, therapist_id),
+            )
+            conn.commit()
+            flash("最低保証を削除しました。", "ok")
+            return redirect(url_for("kiosk", date=service_date, therapist_id=therapist_id))
         finally:
             conn.close()
 

@@ -294,6 +294,13 @@ input::placeholder{ color: rgba(169,180,202,.7); }
 .kioskGuarantee__note{
   margin-top: 6px;
 }
+.kioskGuarantee__status{
+  display:flex;
+  gap: 10px;
+  align-items: center;
+  flex-wrap: wrap;
+  margin-top: 8px;
+}
 .kioskEstimate{
   width: 100%;
   border: 1px solid var(--border);

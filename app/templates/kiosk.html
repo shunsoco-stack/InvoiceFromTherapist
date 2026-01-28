@@ -54,16 +54,35 @@
             </select>
           </div>
 
-          <div id="guaranteeRow" class="kioskRow kioskRow--hidden">
+          <div id="guaranteeRow" class="kioskRow kioskRow--hidden" data-guarantee-lock="{{ '1' if guarantee_lock else '0' }}">
             <div class="kioskLabel">0人の場合の最低保証 / ขั้นต่ำเมื่อไม่มีลูกค้า</div>
             <div class="kioskGuarantee">
               <input type="hidden" name="service_date" value="{{ service_date }}" form="kioskGuaranteeForm" />
               <input type="hidden" name="therapist_id" id="guaranteeTherapistId" value="{{ selected_therapist_id }}" form="kioskGuaranteeForm" />
-              <input id="guaranteeAmount" name="guarantee_amount" class="kioskInput" type="number" inputmode="numeric" min="0" placeholder="5000" form="kioskGuaranteeForm" />
+              <input id="guaranteeAmount"
+                     name="guarantee_amount"
+                     class="kioskInput"
+                     type="number"
+                     inputmode="numeric"
+                     min="0"
+                     placeholder="5000"
+                     value="{% if selected_payout and selected_payout.method == '最低保証' %}{{ selected_payout.paid_amount }}{% endif %}"
+                     form="kioskGuaranteeForm" />
               <button class="btn btn--secondary kioskSmallBtn" type="submit" form="kioskGuaranteeForm">最低保証を記録 / บันทึกขั้นต่ำ</button>
             </div>
+            {% if selected_payout and selected_payout.method == "最低保証" %}
+              <div class="kioskGuarantee__status">
+                <span class="pill pill--ok">最低保証登録済</span>
+                <span class="mono">{{ "{:,}".format(selected_payout.paid_amount) }}円</span>
+                <form method="post" action="{{ url_for('kiosk_guarantee_delete') }}">
+                  <input type="hidden" name="service_date" value="{{ service_date }}" />
+                  <input type="hidden" name="therapist_id" value="{{ selected_therapist_id }}" />
+                  <button class="btn btn--danger kioskSmallBtn" type="submit">削除 / ลบ</button>
+                </form>
+              </div>
+            {% endif %}
             <div id="guaranteeNote" class="kioskGuarantee__note muted small" hidden>
-              最低保証を入力中はメニュー選択できません。
+              最低保証がある場合はメニュー選択できません。
             </div>
           </div>
 
@@ -413,8 +432,9 @@
         }
 
         function applyGuaranteeLock() {
+          const registered = guaranteeRow?.dataset.guaranteeLock === '1';
           const amount = readNumber(guaranteeAmount?.value);
-          const locked = amount > 0;
+          const locked = registered || amount > 0;
           if (locked) {
             menuRow.classList.add('kioskRow--hidden');
             menuSelect1.disabled = true;
