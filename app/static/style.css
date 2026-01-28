@@ -285,6 +285,12 @@ input::placeholder{ color: rgba(169,180,202,.7); }
   flex-wrap: wrap;
   align-items: center;
 }
+.kioskGuarantee{
+  display:flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  align-items: center;
+}
 .kioskEstimate{
   width: 100%;
   border: 1px solid var(--border);

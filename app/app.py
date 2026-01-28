@@ -139,6 +139,46 @@ def create_app() -> Flask:
         finally:
             conn.close()
 
+    @app.post("/kiosk/guarantee")
+    def kiosk_guarantee():
+        service_date = (request.form.get("service_date") or date.today().isoformat()).strip()
+        therapist_id = int(request.form.get("therapist_id") or "0")
+        guarantee_amount = int(request.form.get("guarantee_amount") or "0")
+
+        if therapist_id <= 0:
+            flash("セラピストを選択してください。", "error")
+            return redirect(url_for("kiosk", date=service_date))
+        if guarantee_amount <= 0:
+            flash("最低保証額を入力してください。", "error")
+            return redirect(url_for("kiosk", date=service_date, therapist_id=therapist_id))
+
+        conn = connect()
+        try:
+            row = q1(
+                conn,
+                "SELECT COUNT(*) AS cnt FROM treatments WHERE service_date = ? AND therapist_id = ?",
+                (service_date, therapist_id),
+            )
+            if row and int(row["cnt"]) > 0:
+                flash("この日に施術があるため最低保証は登録できません。", "error")
+                return redirect(url_for("kiosk", date=service_date, therapist_id=therapist_id))
+
+            now = datetime.now().replace(microsecond=0).isoformat()
+            conn.execute(
+                """
+                INSERT INTO payouts(service_date, therapist_id, paid_amount, paid_at, method, notes)
+                VALUES (?, ?, ?, ?, ?, ?)
+                ON CONFLICT(service_date, therapist_id)
+                DO UPDATE SET paid_amount=excluded.paid_amount, paid_at=excluded.paid_at, method=excluded.method, notes=excluded.notes
+                """,
+                (service_date, therapist_id, guarantee_amount, now, "最低保証", "最低保証"),
+            )
+            conn.commit()
+            flash("最低保証を記録しました。", "ok")
+            return redirect(url_for("kiosk", date=service_date, therapist_id=therapist_id, _anchor="summary"))
+        finally:
+            conn.close()
+
     @app.get("/kiosk/<int:treatment_id>/edit")
     def kiosk_edit(treatment_id: int):
         view_date = (request.args.get("date") or "").strip() or None
@@ -788,7 +828,12 @@ def create_app() -> Flask:
 
         payout_rows = q(
             conn,
-            "SELECT * FROM payouts WHERE service_date = ?",
+            """
+            SELECT p.*, th.name AS therapist_name
+            FROM payouts p
+            JOIN therapists th ON th.id = p.therapist_id
+            WHERE p.service_date = ?
+            """,
             (service_date,),
         )
         paid_map = {int(p["therapist_id"]): p for p in payout_rows}
@@ -797,6 +842,20 @@ def create_app() -> Flask:
             s["paid_amount"] = int(paid_map[tid]["paid_amount"]) if tid in paid_map else 0
             s["paid_at"] = paid_map[tid]["paid_at"] if tid in paid_map else None
             s["paid_method"] = paid_map[tid]["method"] if tid in paid_map else None
+
+        for tid, p in paid_map.items():
+            if tid in per_therapist:
+                continue
+            per_therapist[tid] = {
+                "therapist_id": tid,
+                "therapist_name": p["therapist_name"],
+                "sales_total": 0,
+                "payout_total": int(p["paid_amount"]),
+                "paid": True,
+                "paid_amount": int(p["paid_amount"]),
+                "paid_at": p["paid_at"],
+                "paid_method": p["method"],
+            }
 
         summaries = sorted(per_therapist.values(), key=lambda x: (str(x["therapist_name"]), int(x["therapist_id"])))
         return summaries, detail_lines

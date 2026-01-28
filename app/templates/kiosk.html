@@ -54,6 +54,16 @@
             </select>
           </div>
 
+          <div id="guaranteeRow" class="kioskRow kioskRow--hidden">
+            <div class="kioskLabel">0人の場合の最低保証 / ขั้นต่ำเมื่อไม่มีลูกค้า</div>
+            <form class="kioskGuarantee" method="post" action="{{ url_for('kiosk_guarantee') }}">
+              <input type="hidden" name="service_date" value="{{ service_date }}" />
+              <input type="hidden" name="therapist_id" id="guaranteeTherapistId" value="{{ selected_therapist_id }}" />
+              <input name="guarantee_amount" class="kioskInput" type="number" inputmode="numeric" min="0" placeholder="5000" />
+              <button class="btn btn--secondary kioskSmallBtn" type="submit">最低保証を記録 / บันทึกขั้นต่ำ</button>
+            </form>
+          </div>
+
           <div id="menuRow" class="kioskRow kioskRow--hidden">
             <div class="kioskLabel">2) メニュー① / เมนู 1（T/60）</div>
             <select id="menuSelect1" class="kioskSelect" name="menu_id_1" required disabled>
@@ -260,6 +270,8 @@
       <script>
         const therapistSelect = document.getElementById('therapistSelect');
         const menuRow = document.getElementById('menuRow');
+        const guaranteeRow = document.getElementById('guaranteeRow');
+        const guaranteeTherapistId = document.getElementById('guaranteeTherapistId');
         const menuRow2 = document.getElementById('menuRow2');
         const menuSelect1 = document.getElementById('menuSelect1');
         const menuSelect2 = document.getElementById('menuSelect2');
@@ -393,6 +405,12 @@
           menuSelect1.disabled = false;
         }
 
+        function showGuaranteeRow() {
+          if (guaranteeRow) {
+            guaranteeRow.classList.remove('kioskRow--hidden');
+          }
+        }
+
         function showMenu2AndActions() {
           menuRow2.classList.remove('kioskRow--hidden');
           menuSelect2.disabled = false;
@@ -401,6 +419,10 @@
 
         therapistSelect.addEventListener('change', () => {
           if (therapistSelect.value) {
+            showGuaranteeRow();
+            if (guaranteeTherapistId) {
+              guaranteeTherapistId.value = therapistSelect.value;
+            }
             showMenuStep();
             // reset menu/actions for next input
             menuSelect1.value = "";
@@ -435,6 +457,10 @@
 
         // If therapist is preselected (after "save and continue"), open the next step automatically.
         if (therapistSelect.value) {
+          showGuaranteeRow();
+          if (guaranteeTherapistId) {
+            guaranteeTherapistId.value = therapistSelect.value;
+          }
           showMenuStep();
         }
       </script>
