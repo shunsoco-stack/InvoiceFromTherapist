@@ -59,8 +59,11 @@
             <div class="kioskGuarantee">
               <input type="hidden" name="service_date" value="{{ service_date }}" form="kioskGuaranteeForm" />
               <input type="hidden" name="therapist_id" id="guaranteeTherapistId" value="{{ selected_therapist_id }}" form="kioskGuaranteeForm" />
-              <input name="guarantee_amount" class="kioskInput" type="number" inputmode="numeric" min="0" placeholder="5000" form="kioskGuaranteeForm" />
+              <input id="guaranteeAmount" name="guarantee_amount" class="kioskInput" type="number" inputmode="numeric" min="0" placeholder="5000" form="kioskGuaranteeForm" />
               <button class="btn btn--secondary kioskSmallBtn" type="submit" form="kioskGuaranteeForm">最低保証を記録 / บันทึกขั้นต่ำ</button>
+            </div>
+            <div id="guaranteeNote" class="kioskGuarantee__note muted small" hidden>
+              最低保証を入力中はメニュー選択できません。
             </div>
           </div>
 
@@ -179,7 +182,13 @@
                     {% endfor %}
                     {% if items|length == 0 %}
                       <tr>
-                        <td class="kioskSheetTd muted" colspan="2">（まだなし）</td>
+                        <td class="kioskSheetTd muted" colspan="2">
+                          {% if s.paid_method == "最低保証" %}
+                            最低保証
+                          {% else %}
+                            （まだなし）
+                          {% endif %}
+                        </td>
                       </tr>
                     {% endif %}
                   </tbody>
@@ -273,6 +282,8 @@
         const menuRow = document.getElementById('menuRow');
         const guaranteeRow = document.getElementById('guaranteeRow');
         const guaranteeTherapistId = document.getElementById('guaranteeTherapistId');
+        const guaranteeAmount = document.getElementById('guaranteeAmount');
+        const guaranteeNote = document.getElementById('guaranteeNote');
         const menuRow2 = document.getElementById('menuRow2');
         const menuSelect1 = document.getElementById('menuSelect1');
         const menuSelect2 = document.getElementById('menuSelect2');
@@ -401,6 +412,24 @@
           }
         }
 
+        function applyGuaranteeLock() {
+          const amount = readNumber(guaranteeAmount?.value);
+          const locked = amount > 0;
+          if (locked) {
+            menuRow.classList.add('kioskRow--hidden');
+            menuSelect1.disabled = true;
+            menuRow2.classList.add('kioskRow--hidden');
+            menuSelect2.disabled = true;
+            actionsRow.classList.add('kioskRow--hidden');
+            resetEstimate();
+          } else if (therapistSelect.value) {
+            showMenuStep();
+          }
+          if (guaranteeNote) {
+            guaranteeNote.hidden = !locked;
+          }
+        }
+
         function showMenuStep() {
           menuRow.classList.remove('kioskRow--hidden');
           menuSelect1.disabled = false;
@@ -432,6 +461,7 @@
             menuSelect2.disabled = true;
             actionsRow.classList.add('kioskRow--hidden');
             resetEstimate();
+            applyGuaranteeLock();
           }
         });
 
@@ -455,6 +485,9 @@
         if (rSelect) {
           rSelect.addEventListener('change', updateEstimate);
         }
+        if (guaranteeAmount) {
+          guaranteeAmount.addEventListener('input', applyGuaranteeLock);
+        }
 
         // If therapist is preselected (after "save and continue"), open the next step automatically.
         if (therapistSelect.value) {
@@ -463,6 +496,7 @@
             guaranteeTherapistId.value = therapistSelect.value;
           }
           showMenuStep();
+          applyGuaranteeLock();
         }
       </script>
     {% endif %}
