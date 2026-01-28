@@ -56,12 +56,12 @@
 
           <div id="guaranteeRow" class="kioskRow kioskRow--hidden">
             <div class="kioskLabel">0人の場合の最低保証 / ขั้นต่ำเมื่อไม่มีลูกค้า</div>
-            <form class="kioskGuarantee" method="post" action="{{ url_for('kiosk_guarantee') }}">
-              <input type="hidden" name="service_date" value="{{ service_date }}" />
-              <input type="hidden" name="therapist_id" id="guaranteeTherapistId" value="{{ selected_therapist_id }}" />
-              <input name="guarantee_amount" class="kioskInput" type="number" inputmode="numeric" min="0" placeholder="5000" />
-              <button class="btn btn--secondary kioskSmallBtn" type="submit">最低保証を記録 / บันทึกขั้นต่ำ</button>
-            </form>
+            <div class="kioskGuarantee">
+              <input type="hidden" name="service_date" value="{{ service_date }}" form="kioskGuaranteeForm" />
+              <input type="hidden" name="therapist_id" id="guaranteeTherapistId" value="{{ selected_therapist_id }}" form="kioskGuaranteeForm" />
+              <input name="guarantee_amount" class="kioskInput" type="number" inputmode="numeric" min="0" placeholder="5000" form="kioskGuaranteeForm" />
+              <button class="btn btn--secondary kioskSmallBtn" type="submit" form="kioskGuaranteeForm">最低保証を記録 / บันทึกขั้นต่ำ</button>
+            </div>
           </div>
 
           <div id="menuRow" class="kioskRow kioskRow--hidden">
@@ -140,6 +140,7 @@
             <button class="btn btn--secondary kiosk__btn" type="submit" name="continue_add" value="1">保存して続ける / บันทึกต่อ</button>
           </div>
         </form>
+        <form id="kioskGuaranteeForm" method="post" action="{{ url_for('kiosk_guarantee') }}"></form>
       </section>
 
       <section id="summary" class="card kiosk__card">
