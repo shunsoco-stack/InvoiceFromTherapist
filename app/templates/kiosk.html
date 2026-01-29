@@ -47,6 +47,7 @@
                 <option value="{{ t.id }}"
                         data-commission-type="{{ t.commission_type }}"
                         data-commission-value="{{ t.commission_value }}"
+                        data-guarantee-amount="{{ guarantee_map.get(t.id, '') }}"
                         {% if t.id == selected_therapist_id %}selected{% endif %}>
                   {{ t.name }}
                 </option>
@@ -70,17 +71,17 @@
                      form="kioskGuaranteeForm" />
               <button class="btn btn--secondary kioskSmallBtn" type="submit" form="kioskGuaranteeForm">最低保証を記録 / บันทึกขั้นต่ำ</button>
             </div>
-            {% if selected_payout and selected_payout.method == "最低保証" %}
-              <div class="kioskGuarantee__status">
-                <span class="pill pill--ok">最低保証登録済</span>
-                <span class="mono">{{ "{:,}".format(selected_payout.paid_amount) }}円</span>
-                <form method="post" action="{{ url_for('kiosk_guarantee_delete') }}">
-                  <input type="hidden" name="service_date" value="{{ service_date }}" />
-                  <input type="hidden" name="therapist_id" value="{{ selected_therapist_id }}" />
-                  <button class="btn btn--danger kioskSmallBtn" type="submit">削除 / ลบ</button>
-                </form>
-              </div>
-            {% endif %}
+            <div id="guaranteeStatus" class="kioskGuarantee__status" {% if not selected_payout or selected_payout.method != "最低保証" %}hidden{% endif %}>
+              <span class="pill pill--ok">最低保証登録済</span>
+              <span class="mono" id="guaranteeStatusAmount">
+                {% if selected_payout and selected_payout.method == "最低保証" %}
+                  {{ "{:,}".format(selected_payout.paid_amount) }}円
+                {% endif %}
+              </span>
+              <input type="hidden" name="service_date" value="{{ service_date }}" form="kioskGuaranteeDeleteForm" />
+              <input type="hidden" name="therapist_id" id="guaranteeDeleteTherapistId" value="{{ selected_therapist_id }}" form="kioskGuaranteeDeleteForm" />
+              <button class="btn btn--danger kioskSmallBtn" type="submit" form="kioskGuaranteeDeleteForm">削除 / ลบ</button>
+            </div>
             <div id="guaranteeNote" class="kioskGuarantee__note muted small" hidden>
               最低保証がある場合はメニュー選択できません。
             </div>
@@ -163,6 +164,7 @@
           </div>
         </form>
         <form id="kioskGuaranteeForm" method="post" action="{{ url_for('kiosk_guarantee') }}"></form>
+        <form id="kioskGuaranteeDeleteForm" method="post" action="{{ url_for('kiosk_guarantee_delete') }}"></form>
       </section>
 
       <section id="summary" class="card kiosk__card">
@@ -303,6 +305,9 @@
         const guaranteeTherapistId = document.getElementById('guaranteeTherapistId');
         const guaranteeAmount = document.getElementById('guaranteeAmount');
         const guaranteeNote = document.getElementById('guaranteeNote');
+        const guaranteeStatus = document.getElementById('guaranteeStatus');
+        const guaranteeStatusAmount = document.getElementById('guaranteeStatusAmount');
+        const guaranteeDeleteTherapistId = document.getElementById('guaranteeDeleteTherapistId');
         const menuRow2 = document.getElementById('menuRow2');
         const menuSelect1 = document.getElementById('menuSelect1');
         const menuSelect2 = document.getElementById('menuSelect2');
@@ -431,6 +436,29 @@
           }
         }
 
+        function syncGuaranteeState() {
+          const opt = therapistSelect.selectedOptions[0];
+          const amountRaw = opt?.dataset.guaranteeAmount || '';
+          const hasGuarantee = amountRaw !== '';
+          if (guaranteeAmount) {
+            guaranteeAmount.value = hasGuarantee ? amountRaw : '';
+          }
+          if (guaranteeRow) {
+            guaranteeRow.dataset.guaranteeLock = hasGuarantee ? '1' : '0';
+          }
+          if (guaranteeStatus) {
+            guaranteeStatus.hidden = !hasGuarantee;
+          }
+          if (guaranteeStatusAmount && hasGuarantee) {
+            const amt = Number(amountRaw);
+            guaranteeStatusAmount.textContent = Number.isFinite(amt) ? `${amt.toLocaleString()}円` : '';
+          }
+          if (guaranteeDeleteTherapistId) {
+            guaranteeDeleteTherapistId.value = therapistSelect.value;
+          }
+          applyGuaranteeLock();
+        }
+
         function applyGuaranteeLock() {
           const registered = guaranteeRow?.dataset.guaranteeLock === '1';
           const amount = readNumber(guaranteeAmount?.value);
@@ -481,7 +509,7 @@
             menuSelect2.disabled = true;
             actionsRow.classList.add('kioskRow--hidden');
             resetEstimate();
-            applyGuaranteeLock();
+            syncGuaranteeState();
           }
         });
 
@@ -516,7 +544,7 @@
             guaranteeTherapistId.value = therapistSelect.value;
           }
           showMenuStep();
-          applyGuaranteeLock();
+          syncGuaranteeState();
         }
       </script>
     {% endif %}

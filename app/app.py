@@ -69,6 +69,12 @@ def create_app() -> Flask:
             p_totals = _kiosk_p_totals(details)
             r_totals = _kiosk_r_totals(details)
             recent = _kiosk_recent_treatments(conn, service_date)
+            guarantee_rows = q(
+                conn,
+                "SELECT therapist_id, paid_amount FROM payouts WHERE service_date = ? AND method = ?",
+                (service_date, "最低保証"),
+            )
+            guarantee_map = {int(r["therapist_id"]): int(r["paid_amount"]) for r in guarantee_rows}
             selected_payout = None
             guarantee_lock = False
             if selected_therapist_id > 0:
@@ -99,6 +105,7 @@ def create_app() -> Flask:
                 selected_therapist_id=selected_therapist_id,
                 selected_payout=selected_payout,
                 guarantee_lock=guarantee_lock,
+                guarantee_map=guarantee_map,
             )
         finally:
             conn.close()
