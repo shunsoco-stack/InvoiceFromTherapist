@@ -226,22 +226,31 @@ input::placeholder{ color: rgba(169,180,202,.7); }
 }
 .homeSimple__btn--supplies{
   position: relative;
+  font-size: 20px;
+  font-weight: 700;
+  padding: 14px 18px;
+}
+.homeSimple__btnLabel{
+  display:inline-flex;
+  align-items:center;
+  gap: 6px;
 }
 .homeSimple__btnBadge{
   position: absolute;
-  top: -6px;
-  right: -6px;
-  width: 22px;
-  height: 22px;
+  top: -8px;
+  right: -8px;
+  width: 26px;
+  height: 26px;
   border-radius: 999px;
-  background: var(--danger);
+  background: #ff4d6d;
   color: #ffffff;
   font-weight: 800;
-  font-size: 13px;
+  font-size: 16px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  box-shadow: 0 6px 14px rgba(255, 77, 109, 0.35);
+  box-shadow: 0 6px 14px rgba(255, 77, 109, 0.45);
+  border: 2px solid #ffffff;
 }
 .homeSimple__btn--admin{
   font-size: 18px;
