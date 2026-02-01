@@ -11,6 +11,7 @@
     <div class="homeSimple__buttons">
       <a class="btn homeSimple__btn homeSimple__btn--primary" href="{{ url_for('kiosk') }}">施術入力 / บันทึก</a>
       <a class="btn btn--secondary homeSimple__btn homeSimple__btn--admin" href="{{ url_for('admin') }}">管理 / จัดการ</a>
+      <a class="btn btn--secondary homeSimple__btn" href="{{ url_for('admin', _anchor='supplies') }}">備品 / ของใช้</a>
     </div>
   </div>
 {% endblock %}
