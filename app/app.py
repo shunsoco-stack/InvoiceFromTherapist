@@ -262,26 +262,25 @@ def create_app() -> Flask:
     @app.post("/supplies/new")
     def supplies_new():
         name = (request.form.get("name") or "").strip()
-        name_th = (request.form.get("name_th") or "").strip() or None
         if not name:
             flash("備品名は必須です。", "error")
-            return _redirect_supplies()
+            return redirect(url_for("admin", _anchor="supplies"))
         conn = connect()
         try:
             existing = q1(conn, "SELECT id FROM supplies WHERE name = ?", (name,))
             if existing:
                 flash("同名の備品が既に登録されています。", "error")
-                return _redirect_supplies()
+                return redirect(url_for("admin", _anchor="supplies"))
             exec1(
                 conn,
                 """
-                INSERT INTO supplies(name, name_th, is_active, created_at)
-                VALUES (?, ?, 1, ?)
+                INSERT INTO supplies(name, is_active, created_at)
+                VALUES (?, 1, ?)
                 """,
-                (name, name_th, now_iso()),
+                (name, now_iso()),
             )
             flash("備品を追加しました。", "ok")
-            return _redirect_supplies()
+            return redirect(url_for("admin", _anchor="supplies"))
         finally:
             conn.close()
 
@@ -292,7 +291,7 @@ def create_app() -> Flask:
             supply = q1(conn, "SELECT * FROM supplies WHERE id = ? AND is_active = 1", (supply_id,))
             if not supply:
                 flash("対象の備品が見つかりません。", "error")
-                return _redirect_supplies()
+                return redirect(url_for("admin", _anchor="supplies"))
             open_alert = q1(
                 conn,
                 "SELECT id FROM supply_alerts WHERE supply_id = ? AND status = 'open'",
@@ -300,7 +299,7 @@ def create_app() -> Flask:
             )
             if open_alert:
                 flash("既に通知済みです。", "error")
-                return _redirect_supplies()
+                return redirect(url_for("admin", _anchor="supplies"))
             exec1(
                 conn,
                 """
@@ -310,7 +309,7 @@ def create_app() -> Flask:
                 (supply_id, now_iso()),
             )
             flash("不足の通知を送信しました。", "ok")
-            return _redirect_supplies()
+            return redirect(url_for("admin", _anchor="supplies"))
         finally:
             conn.close()
 
@@ -321,36 +320,17 @@ def create_app() -> Flask:
             alert = q1(conn, "SELECT * FROM supply_alerts WHERE id = ?", (alert_id,))
             if not alert:
                 flash("対象の通知が見つかりません。", "error")
-                return _redirect_supplies()
+                return redirect(url_for("admin", _anchor="supplies"))
             if str(alert["status"]) != "open":
                 flash("既に対応済みです。", "error")
-                return _redirect_supplies()
+                return redirect(url_for("admin", _anchor="supplies"))
             conn.execute(
                 "UPDATE supply_alerts SET status = 'ack', acknowledged_at = ? WHERE id = ?",
                 (now_iso(), alert_id),
             )
             conn.commit()
             flash("通知を対応済みにしました。", "ok")
-            return _redirect_supplies()
-        finally:
-            conn.close()
-
-    @app.post("/supplies/<int:supply_id>/update")
-    def supplies_update(supply_id: int):
-        name_th = (request.form.get("name_th") or "").strip() or None
-        conn = connect()
-        try:
-            supply = q1(conn, "SELECT id FROM supplies WHERE id = ?", (supply_id,))
-            if not supply:
-                flash("対象の備品が見つかりません。", "error")
-                return _redirect_supplies()
-            conn.execute(
-                "UPDATE supplies SET name_th = ? WHERE id = ?",
-                (name_th, supply_id),
-            )
-            conn.commit()
-            flash("タイ語名を更新しました。", "ok")
-            return _redirect_supplies()
+            return redirect(url_for("admin", _anchor="supplies"))
         finally:
             conn.close()
 
@@ -485,7 +465,7 @@ def create_app() -> Flask:
         supply_alerts = q(
             conn,
             """
-            SELECT sa.id, sa.created_at, s.name AS supply_name, s.name_th AS supply_name_th
+            SELECT sa.id, sa.created_at, s.name AS supply_name
             FROM supply_alerts sa
             JOIN supplies s ON s.id = sa.supply_id
             WHERE sa.status = 'open'
@@ -493,12 +473,6 @@ def create_app() -> Flask:
             """,
         )
         return supplies, supply_alerts
-
-    def _redirect_supplies():
-        ref = request.referrer or ""
-        if ref.startswith(request.host_url):
-            return redirect(ref)
-        return redirect(url_for("supplies_page"))
 
     def _kiosk_hpb_totals(details: List[Dict[str, object]]) -> Dict[int, int]:
         totals: Dict[int, int] = {}

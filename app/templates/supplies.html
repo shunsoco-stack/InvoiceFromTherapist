@@ -23,12 +23,7 @@
           <tbody>
             {% for alert in supply_alerts %}
               <tr>
-                <td>
-                  {{ alert.supply_name }}
-                  {% if alert.supply_name_th %}
-                    <div class="muted small">{{ alert.supply_name_th }}</div>
-                  {% endif %}
-                </td>
+                <td>{{ alert.supply_name }}</td>
                 <td class="mono">{{ alert.created_at }}</td>
                 <td class="right">
                   <form method="post" action="{{ url_for('supply_alert_ack', alert_id=alert.id) }}">
@@ -47,7 +42,6 @@
     <h2>備品の追加</h2>
     <form class="inline" method="post" action="{{ url_for('supplies_new') }}">
       <input name="name" placeholder="例）タオル / ผ้าเช็ดตัว" />
-      <input name="name_th" placeholder="タイ語（任意）" />
       <button class="btn" type="submit">追加</button>
     </form>
   </section>
@@ -62,7 +56,6 @@
           <thead>
             <tr>
               <th>備品</th>
-              <th>タイ語</th>
               <th>状態</th>
               <th></th>
             </tr>
@@ -70,18 +63,7 @@
           <tbody>
             {% for supply in supplies %}
               <tr>
-                <td>
-                  {{ supply.name }}
-                  {% if supply.name_th %}
-                    <div class="muted small">{{ supply.name_th }}</div>
-                  {% endif %}
-                </td>
-                <td>
-                  <form class="inline" method="post" action="{{ url_for('supplies_update', supply_id=supply.id) }}">
-                    <input name="name_th" value="{{ supply.name_th or '' }}" placeholder="ไทย" />
-                    <button class="btn btn--secondary" type="submit">更新</button>
-                  </form>
-                </td>
+                <td>{{ supply.name }}</td>
                 <td>
                   {% if supply.open_alerts|int > 0 %}
                     <span class="pill">通知中</span>

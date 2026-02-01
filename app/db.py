@@ -60,7 +60,6 @@ CREATE TABLE IF NOT EXISTS payouts (
 CREATE TABLE IF NOT EXISTS supplies (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   name TEXT NOT NULL,
-  name_th TEXT,
   is_active INTEGER NOT NULL DEFAULT 1,
   created_at TEXT NOT NULL
 );
@@ -107,7 +106,6 @@ def init_db() -> None:
         _ensure_column(conn, table="treatments", column="hpb", col_def="INTEGER NOT NULL DEFAULT 0")
         _ensure_column(conn, table="treatments", column="p", col_def="INTEGER NOT NULL DEFAULT 0")
         _ensure_column(conn, table="treatments", column="r", col_def="INTEGER NOT NULL DEFAULT 0")
-        _ensure_column(conn, table="supplies", column="name_th", col_def="TEXT")
         conn.commit()
     finally:
         conn.close()
