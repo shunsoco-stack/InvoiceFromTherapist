@@ -52,34 +52,23 @@ def create_app() -> Flask:
         today = date.today().isoformat()
         conn = connect()
         try:
-            supplies = q(
-                conn,
-                """
-                SELECT
-                  s.*,
-                  (
-                    SELECT COUNT(*)
-                    FROM supply_alerts sa
-                    WHERE sa.supply_id = s.id AND sa.status = 'open'
-                  ) AS open_alerts
-                FROM supplies s
-                WHERE s.is_active = 1
-                ORDER BY s.name ASC, s.id ASC
-                """,
-            )
-            supply_alerts = q(
-                conn,
-                """
-                SELECT sa.id, sa.created_at, s.name AS supply_name
-                FROM supply_alerts sa
-                JOIN supplies s ON s.id = sa.supply_id
-                WHERE sa.status = 'open'
-                ORDER BY sa.created_at DESC, sa.id DESC
-                """,
-            )
+            supplies, supply_alerts = _load_supply_context(conn)
             return render_template(
                 "admin.html",
                 today=today,
+                supplies=supplies,
+                supply_alerts=supply_alerts,
+            )
+        finally:
+            conn.close()
+
+    @app.get("/supplies")
+    def supplies_page():
+        conn = connect()
+        try:
+            supplies, supply_alerts = _load_supply_context(conn)
+            return render_template(
+                "supplies.html",
                 supplies=supplies,
                 supply_alerts=supply_alerts,
             )
@@ -456,6 +445,34 @@ def create_app() -> Flask:
             for _ in range(qty):
                 out[tid].append({"treatment_id": treatment_id, "menu_name": name, "price": price})
         return out
+
+    def _load_supply_context(conn):
+        supplies = q(
+            conn,
+            """
+            SELECT
+              s.*,
+              (
+                SELECT COUNT(*)
+                FROM supply_alerts sa
+                WHERE sa.supply_id = s.id AND sa.status = 'open'
+              ) AS open_alerts
+            FROM supplies s
+            WHERE s.is_active = 1
+            ORDER BY s.name ASC, s.id ASC
+            """,
+        )
+        supply_alerts = q(
+            conn,
+            """
+            SELECT sa.id, sa.created_at, s.name AS supply_name
+            FROM supply_alerts sa
+            JOIN supplies s ON s.id = sa.supply_id
+            WHERE sa.status = 'open'
+            ORDER BY sa.created_at DESC, sa.id DESC
+            """,
+        )
+        return supplies, supply_alerts
 
     def _kiosk_hpb_totals(details: List[Dict[str, object]]) -> Dict[int, int]:
         totals: Dict[int, int] = {}
