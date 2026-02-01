@@ -11,7 +11,12 @@
     <div class="homeSimple__buttons">
       <a class="btn homeSimple__btn homeSimple__btn--primary" href="{{ url_for('kiosk') }}">施術入力 / บันทึก</a>
       <a class="btn btn--secondary homeSimple__btn homeSimple__btn--admin" href="{{ url_for('admin') }}">管理 / จัดการ</a>
-      <a class="btn btn--secondary homeSimple__btn" href="{{ url_for('supplies_page') }}">備品 / ของใช้</a>
+      <a class="btn btn--secondary homeSimple__btn homeSimple__btn--supplies" href="{{ url_for('supplies_page') }}">
+        備品 / ของใช้
+        {% if supply_alerts_count and supply_alerts_count > 0 %}
+          <span class="homeSimple__btnBadge" aria-hidden="true">!</span>
+        {% endif %}
+      </a>
     </div>
   </div>
 {% endblock %}

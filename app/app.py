@@ -34,10 +34,22 @@ def create_app() -> Flask:
     @app.get("/")
     def index():
         today = date.today().isoformat()
+        conn = connect()
+        try:
+            row = q1(conn, "SELECT COUNT(*) AS cnt FROM supply_alerts WHERE status = 'open'")
+            supply_alerts_count = int(row["cnt"]) if row else 0
+        finally:
+            conn.close()
         logo_filename = _find_logo_filename()
         logo_url = url_for("static", filename=logo_filename) if logo_filename else None
         logo_alt = (os.getenv("SALON_LOGO_ALT") or "ロゴ").strip() or "ロゴ"
-        return render_template("index.html", today=today, logo_url=logo_url, logo_alt=logo_alt)
+        return render_template(
+            "index.html",
+            today=today,
+            logo_url=logo_url,
+            logo_alt=logo_alt,
+            supply_alerts_count=supply_alerts_count,
+        )
 
     @app.get("/lp")
     @app.get("/landing")

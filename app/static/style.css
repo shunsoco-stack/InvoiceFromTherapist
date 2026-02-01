@@ -224,6 +224,25 @@ input::placeholder{ color: rgba(169,180,202,.7); }
   padding: 26px 22px;
   font-weight: 800;
 }
+.homeSimple__btn--supplies{
+  position: relative;
+}
+.homeSimple__btnBadge{
+  position: absolute;
+  top: -6px;
+  right: -6px;
+  width: 22px;
+  height: 22px;
+  border-radius: 999px;
+  background: var(--danger);
+  color: #ffffff;
+  font-weight: 800;
+  font-size: 13px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 6px 14px rgba(255, 77, 109, 0.35);
+}
 .homeSimple__btn--admin{
   font-size: 18px;
   padding: 12px 16px;
