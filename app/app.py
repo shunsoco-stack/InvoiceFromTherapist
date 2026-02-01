@@ -50,7 +50,41 @@ def create_app() -> Flask:
     @app.get("/admin")
     def admin():
         today = date.today().isoformat()
-        return render_template("admin.html", today=today)
+        conn = connect()
+        try:
+            supplies = q(
+                conn,
+                """
+                SELECT
+                  s.*,
+                  (
+                    SELECT COUNT(*)
+                    FROM supply_alerts sa
+                    WHERE sa.supply_id = s.id AND sa.status = 'open'
+                  ) AS open_alerts
+                FROM supplies s
+                WHERE s.is_active = 1
+                ORDER BY s.name ASC, s.id ASC
+                """,
+            )
+            supply_alerts = q(
+                conn,
+                """
+                SELECT sa.id, sa.created_at, s.name AS supply_name
+                FROM supply_alerts sa
+                JOIN supplies s ON s.id = sa.supply_id
+                WHERE sa.status = 'open'
+                ORDER BY sa.created_at DESC, sa.id DESC
+                """,
+            )
+            return render_template(
+                "admin.html",
+                today=today,
+                supplies=supplies,
+                supply_alerts=supply_alerts,
+            )
+        finally:
+            conn.close()
 
     # ----------------
     # Kiosk (simple input for therapists)
@@ -230,6 +264,84 @@ def create_app() -> Flask:
             conn.commit()
             flash("最低保証を削除しました。", "ok")
             return redirect(url_for("kiosk", date=service_date, therapist_id=therapist_id))
+        finally:
+            conn.close()
+
+    # ----------------
+    # Supplies
+    # ----------------
+    @app.post("/supplies/new")
+    def supplies_new():
+        name = (request.form.get("name") or "").strip()
+        if not name:
+            flash("備品名は必須です。", "error")
+            return redirect(url_for("admin", _anchor="supplies"))
+        conn = connect()
+        try:
+            existing = q1(conn, "SELECT id FROM supplies WHERE name = ?", (name,))
+            if existing:
+                flash("同名の備品が既に登録されています。", "error")
+                return redirect(url_for("admin", _anchor="supplies"))
+            exec1(
+                conn,
+                """
+                INSERT INTO supplies(name, is_active, created_at)
+                VALUES (?, 1, ?)
+                """,
+                (name, now_iso()),
+            )
+            flash("備品を追加しました。", "ok")
+            return redirect(url_for("admin", _anchor="supplies"))
+        finally:
+            conn.close()
+
+    @app.post("/supplies/<int:supply_id>/notify")
+    def supplies_notify(supply_id: int):
+        conn = connect()
+        try:
+            supply = q1(conn, "SELECT * FROM supplies WHERE id = ? AND is_active = 1", (supply_id,))
+            if not supply:
+                flash("対象の備品が見つかりません。", "error")
+                return redirect(url_for("admin", _anchor="supplies"))
+            open_alert = q1(
+                conn,
+                "SELECT id FROM supply_alerts WHERE supply_id = ? AND status = 'open'",
+                (supply_id,),
+            )
+            if open_alert:
+                flash("既に通知済みです。", "error")
+                return redirect(url_for("admin", _anchor="supplies"))
+            exec1(
+                conn,
+                """
+                INSERT INTO supply_alerts(supply_id, status, created_at, acknowledged_at)
+                VALUES (?, 'open', ?, NULL)
+                """,
+                (supply_id, now_iso()),
+            )
+            flash("不足の通知を送信しました。", "ok")
+            return redirect(url_for("admin", _anchor="supplies"))
+        finally:
+            conn.close()
+
+    @app.post("/supplies/alerts/<int:alert_id>/ack")
+    def supply_alert_ack(alert_id: int):
+        conn = connect()
+        try:
+            alert = q1(conn, "SELECT * FROM supply_alerts WHERE id = ?", (alert_id,))
+            if not alert:
+                flash("対象の通知が見つかりません。", "error")
+                return redirect(url_for("admin", _anchor="supplies"))
+            if str(alert["status"]) != "open":
+                flash("既に対応済みです。", "error")
+                return redirect(url_for("admin", _anchor="supplies"))
+            conn.execute(
+                "UPDATE supply_alerts SET status = 'ack', acknowledged_at = ? WHERE id = ?",
+                (now_iso(), alert_id),
+            )
+            conn.commit()
+            flash("通知を対応済みにしました。", "ok")
+            return redirect(url_for("admin", _anchor="supplies"))
         finally:
             conn.close()
 

@@ -57,8 +57,25 @@ CREATE TABLE IF NOT EXISTS payouts (
   UNIQUE(service_date, therapist_id)
 );
 
+CREATE TABLE IF NOT EXISTS supplies (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  name TEXT NOT NULL,
+  is_active INTEGER NOT NULL DEFAULT 1,
+  created_at TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS supply_alerts (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  supply_id INTEGER NOT NULL,
+  status TEXT NOT NULL DEFAULT 'open', -- open | ack
+  created_at TEXT NOT NULL,
+  acknowledged_at TEXT,
+  FOREIGN KEY (supply_id) REFERENCES supplies(id)
+);
+
 CREATE INDEX IF NOT EXISTS idx_treatments_date ON treatments(service_date);
 CREATE INDEX IF NOT EXISTS idx_treatments_therapist ON treatments(therapist_id);
+CREATE INDEX IF NOT EXISTS idx_supply_alerts_supply ON supply_alerts(supply_id);
 """
 
 

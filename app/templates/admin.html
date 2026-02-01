@@ -37,5 +37,83 @@
       <a class="btn" href="{{ url_for('report_payouts_csv') }}">支払CSV / การจ่าย</a>
     </div>
   </section>
+
+  <section id="supplies" class="card">
+    <h2>備品アラート</h2>
+    {% if supply_alerts|length == 0 %}
+      <p class="muted">未対応のお知らせはありません。</p>
+    {% else %}
+      <div class="table-wrap">
+        <table class="table">
+          <thead>
+            <tr>
+              <th>備品</th>
+              <th>通知日時</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for alert in supply_alerts %}
+              <tr>
+                <td>{{ alert.supply_name }}</td>
+                <td class="mono">{{ alert.created_at }}</td>
+                <td class="right">
+                  <form method="post" action="{{ url_for('supply_alert_ack', alert_id=alert.id) }}">
+                    <button class="btn btn--secondary" type="submit">対応済み</button>
+                  </form>
+                </td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    {% endif %}
+  </section>
+
+  <section class="card">
+    <h2>備品の追加</h2>
+    <form class="inline" method="post" action="{{ url_for('supplies_new') }}">
+      <input name="name" placeholder="例）タオル / ผ้าเช็ดตัว" />
+      <button class="btn" type="submit">追加</button>
+    </form>
+  </section>
+
+  <section class="card">
+    <h2>備品一覧</h2>
+    {% if supplies|length == 0 %}
+      <p class="muted">備品が登録されていません。</p>
+    {% else %}
+      <div class="table-wrap">
+        <table class="table">
+          <thead>
+            <tr>
+              <th>備品</th>
+              <th>状態</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for supply in supplies %}
+              <tr>
+                <td>{{ supply.name }}</td>
+                <td>
+                  {% if supply.open_alerts|int > 0 %}
+                    <span class="pill">通知中</span>
+                  {% else %}
+                    <span class="muted">-</span>
+                  {% endif %}
+                </td>
+                <td class="right">
+                  <form method="post" action="{{ url_for('supplies_notify', supply_id=supply.id) }}">
+                    <button class="btn btn--secondary" type="submit">不足通知</button>
+                  </form>
+                </td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    {% endif %}
+  </section>
 {% endblock %}
 
