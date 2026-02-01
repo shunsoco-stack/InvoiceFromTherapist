@@ -57,6 +57,7 @@
             <tr>
               <th>備品</th>
               <th>状態</th>
+              <th>名称変更</th>
               <th></th>
             </tr>
           </thead>
@@ -70,6 +71,12 @@
                   {% else %}
                     <span class="muted">-</span>
                   {% endif %}
+                </td>
+                <td>
+                  <form class="inline" method="post" action="{{ url_for('supplies_rename', supply_id=supply.id) }}">
+                    <input name="name" value="{{ supply.name }}" />
+                    <button class="btn btn--secondary" type="submit">更新</button>
+                  </form>
                 </td>
                 <td class="right">
                   <form method="post" action="{{ url_for('supplies_notify', supply_id=supply.id) }}">
