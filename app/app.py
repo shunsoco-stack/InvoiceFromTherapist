@@ -12,7 +12,12 @@ from app.db import connect, exec1, init_db, now_iso, q, q1
 
 
 def create_app() -> Flask:
-    app = Flask(__name__)
+    app = Flask(
+        __name__,
+        static_url_path="/static",
+        static_folder="static",
+        template_folder="templates",
+    )
     app.secret_key = os.getenv("SALON_SECRET_KEY", "dev-secret-key")  # ローカル運用想定
 
     init_db()
