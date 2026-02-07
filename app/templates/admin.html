@@ -56,7 +56,7 @@
             {% for alert in supply_alerts %}
               <tr>
                 <td>{{ alert.supply_name }}</td>
-                <td class="mono">{{ alert.created_at }}</td>
+                <td class="mono">{{ alert.created_at_jst }}</td>
                 <td class="right">
                   <form method="post" action="{{ url_for('supply_alert_ack', alert_id=alert.id) }}">
                     <button class="btn btn--secondary" type="submit">対応済み</button>

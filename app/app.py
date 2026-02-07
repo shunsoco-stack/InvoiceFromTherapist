@@ -1,6 +1,6 @@
 import csv
 import io
-from datetime import date, datetime
+from datetime import date, datetime, timedelta, timezone
 from typing import Dict, List, Optional, Tuple
 
 import os
@@ -512,7 +512,24 @@ def create_app() -> Flask:
             ORDER BY sa.created_at DESC, sa.id DESC
             """,
         )
+        for alert in supply_alerts:
+            alert["created_at_jst"] = _format_jst(alert["created_at"])
         return supplies, supply_alerts
+
+    def _format_jst(value: Optional[str]) -> str:
+        if not value:
+            return ""
+        raw = value.strip()
+        try:
+            if raw.endswith("Z"):
+                raw = raw[:-1] + "+00:00"
+            dt = datetime.fromisoformat(raw)
+        except ValueError:
+            return value
+        if dt.tzinfo is None:
+            dt = dt.replace(tzinfo=timezone.utc)
+        jst = dt.astimezone(timezone(timedelta(hours=9)))
+        return jst.strftime("%Y-%m-%d %H:%M")
 
     def _redirect_supplies():
         ref = request.referrer or ""
