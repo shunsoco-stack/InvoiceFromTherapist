@@ -502,7 +502,7 @@ def create_app() -> Flask:
             ORDER BY s.name ASC, s.id ASC
             """,
         )
-        supply_alerts = q(
+        raw_alerts = q(
             conn,
             """
             SELECT sa.id, sa.created_at, s.name AS supply_name
@@ -512,8 +512,11 @@ def create_app() -> Flask:
             ORDER BY sa.created_at DESC, sa.id DESC
             """,
         )
-        for alert in supply_alerts:
-            alert["created_at_jst"] = _format_jst(alert["created_at"])
+        supply_alerts = []
+        for row in raw_alerts:
+            alert = dict(row)
+            alert["created_at_jst"] = _format_jst(alert.get("created_at"))
+            supply_alerts.append(alert)
         return supplies, supply_alerts
 
     def _format_jst(value: Optional[str]) -> str:
