@@ -200,7 +200,7 @@ def create_app() -> Flask:
             if continue_add:
                 # 同じセラピストで続けてメニューを追加しやすくする
                 return redirect(url_for("kiosk", date=service_date, therapist_id=therapist_id, _anchor="input"))
-            return redirect(url_for("kiosk", _anchor="summary"))
+            return redirect(url_for("kiosk", date=service_date, _anchor="summary"))
         finally:
             conn.close()
 
