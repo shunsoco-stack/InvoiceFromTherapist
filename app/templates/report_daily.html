@@ -25,6 +25,7 @@
         <thead>
           <tr>
             <th>セラピスト</th>
+            <th class="right">客数</th>
             <th class="right">売上合計</th>
             <th class="right">支払合計</th>
             <th>支払状況</th>
@@ -35,6 +36,7 @@
           {% for s in summaries %}
             <tr>
               <td>{{ s.therapist_name }}</td>
+              <td class="right mono">{{ s.customer_count }}</td>
               <td class="right mono">{{ "{:,}".format(s.sales_total) }}円</td>
               <td class="right mono strong">{{ "{:,}".format(s.payout_total) }}円</td>
               <td>
@@ -64,7 +66,7 @@
             </tr>
           {% endfor %}
           {% if summaries|length == 0 %}
-            <tr><td colspan="5" class="muted">この日の施術記録がありません。</td></tr>
+            <tr><td colspan="6" class="muted">この日の施術記録がありません。</td></tr>
           {% endif %}
         </tbody>
       </table>
@@ -81,6 +83,7 @@
             <th>セラピスト</th>
             <th>メニュー</th>
             <th class="right">数量</th>
+            <th class="right">客数</th>
             <th class="right">HPB</th>
             <th class="right">P</th>
             <th class="right">R</th>
@@ -98,6 +101,7 @@
               <td>{{ d.therapist_name }}</td>
               <td>{{ d.menu_name }}</td>
               <td class="right mono">{{ d.quantity }}</td>
+              <td class="right mono">{% if d.count_as_customer %}{{ d.quantity }}{% else %}—{% endif %}</td>
               <td class="right mono">{{ d.hpb }}</td>
               <td class="right mono">{{ d.p }}</td>
               <td class="right mono">{{ d.r }}</td>
@@ -115,7 +119,7 @@
             </tr>
           {% endfor %}
           {% if details|length == 0 %}
-            <tr><td colspan="12" class="muted">明細がありません。</td></tr>
+            <tr><td colspan="13" class="muted">明細がありません。</td></tr>
           {% endif %}
         </tbody>
       </table>

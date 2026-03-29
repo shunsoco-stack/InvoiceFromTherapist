@@ -40,6 +40,7 @@ CREATE TABLE IF NOT EXISTS treatments (
   commission_type_override TEXT, -- nullable
   commission_value_override INTEGER,
   notes TEXT,
+  count_as_customer INTEGER NOT NULL DEFAULT 1, -- 0 = kiosk menu slot 2 (add-on), not counted as guest/customer
   created_at TEXT NOT NULL,
   FOREIGN KEY (therapist_id) REFERENCES therapists(id),
   FOREIGN KEY (menu_id) REFERENCES menus(id)
@@ -106,9 +107,23 @@ def init_db() -> None:
         _ensure_column(conn, table="treatments", column="hpb", col_def="INTEGER NOT NULL DEFAULT 0")
         _ensure_column(conn, table="treatments", column="p", col_def="INTEGER NOT NULL DEFAULT 0")
         _ensure_column(conn, table="treatments", column="r", col_def="INTEGER NOT NULL DEFAULT 0")
+        _ensure_count_as_customer_column(conn)
         conn.commit()
     finally:
         conn.close()
+
+
+def _ensure_count_as_customer_column(conn: sqlite3.Connection) -> None:
+    cols = q(conn, "PRAGMA table_info(treatments)")
+    existing = {str(r["name"]) for r in cols}
+    if "count_as_customer" in existing:
+        return
+    conn.execute(
+        "ALTER TABLE treatments ADD COLUMN count_as_customer INTEGER NOT NULL DEFAULT 1",
+    )
+    conn.execute(
+        "UPDATE treatments SET count_as_customer = 1 WHERE count_as_customer IS NULL",
+    )
 
 
 def _ensure_column(conn: sqlite3.Connection, table: str, column: str, col_def: str) -> None:

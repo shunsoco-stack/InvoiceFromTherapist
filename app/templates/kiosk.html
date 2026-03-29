@@ -215,6 +215,10 @@
                   </tbody>
                   <tfoot>
                     <tr>
+                      <td class="kioskSheetTd">客数 / ลูกค้า</td>
+                      <td class="kioskSheetTd kioskSheetTd--right mono strong">{{ s.customer_count }}</td>
+                    </tr>
+                    <tr>
                       <td class="kioskSheetTd">合計 / รวม</td>
                       <td class="kioskSheetTd kioskSheetTd--right mono">{{ "{:,}".format(s.sales_total) }}</td>
                     </tr>
@@ -294,6 +298,7 @@
         <h2>ヘルプ / ช่วยเหลือ</h2>
         <ul class="list">
           <li>押す順番 / ลำดับ: <b>セラピスト → メニュー① → （メニュー②） → 保存</b></li>
+          <li><b>メニュー②</b>は売上・歩合には含まれますが、<b>客数</b>の集計には含みません（同一組のオプション扱い）。</li>
           <li>間違えたら「今日の履歴」から修正/削除できます。</li>
         </ul>
       </section>

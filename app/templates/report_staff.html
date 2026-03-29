@@ -32,7 +32,8 @@
         <thead>
           <tr>
             <th>スタッフ</th>
-            <th class="right">件数</th>
+            <th class="right">客数</th>
+            <th class="right muted small">明細行</th>
             <th class="right">売上合計</th>
             <th class="right">支払合計</th>
           </tr>
@@ -41,7 +42,8 @@
           {% for t in therapist_totals %}
             <tr>
               <td>{{ t.therapist_name }}</td>
-              <td class="right mono">{{ t.count }}件</td>
+              <td class="right mono">{{ t.customer_count }}</td>
+              <td class="right mono muted small">{{ t.line_count }}</td>
               <td class="right mono">{{ "{:,}".format(t.sales) }}円</td>
               <td class="right mono strong">{{ "{:,}".format(t.payout) }}円</td>
             </tr>
@@ -61,6 +63,7 @@
             <th>スタッフ</th>
             <th>日付</th>
             <th>メニュー</th>
+            <th class="right">客数</th>
             <th class="right">単価</th>
             <th class="right">HPB</th>
             <th class="right">P</th>
@@ -77,6 +80,7 @@
               <td>{{ d.therapist_name }}</td>
               <td class="mono">{{ d.service_date }}</td>
               <td>{{ d.menu_name }}</td>
+              <td class="right mono">{% if d.count_as_customer %}{{ d.quantity }}{% else %}—{% endif %}</td>
               <td class="right mono">{{ "{:,}".format(d.price) }}円</td>
               <td class="right mono">{% if d.hpb %}{{ d.hpb }}{% endif %}</td>
               <td class="right mono">{% if d.p %}{{ d.p }}{% endif %}</td>
@@ -90,7 +94,7 @@
             </tr>
           {% endfor %}
           {% if details|length == 0 %}
-            <tr><td colspan="11" class="muted">該当する施術記録がありません。</td></tr>
+            <tr><td colspan="12" class="muted">該当する施術記録がありません。</td></tr>
           {% endif %}
         </tbody>
       </table>

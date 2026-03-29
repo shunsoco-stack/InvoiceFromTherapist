@@ -184,16 +184,20 @@ def create_app() -> Flask:
             # 最大2メニュー。割引/ポイント/指名料は1件目にのみ付けて二重計上を防ぐ。
             conn.execute(
                 """
-                INSERT INTO treatments(service_date, therapist_id, menu_id, quantity, hpb, p, r, notes, created_at)
-                VALUES (?, ?, ?, ?, ?, ?, ?, NULL, ?)
+                INSERT INTO treatments(
+                  service_date, therapist_id, menu_id, quantity, hpb, p, r, notes, count_as_customer, created_at
+                )
+                VALUES (?, ?, ?, ?, ?, ?, ?, NULL, 1, ?)
                 """,
                 (service_date, therapist_id, menu_id_1, quantity, hpb, p, r, now_iso()),
             )
             if menu_id_2 > 0:
                 conn.execute(
                     """
-                    INSERT INTO treatments(service_date, therapist_id, menu_id, quantity, hpb, p, r, notes, created_at)
-                    VALUES (?, ?, ?, ?, 0, 0, 0, NULL, ?)
+                    INSERT INTO treatments(
+                      service_date, therapist_id, menu_id, quantity, hpb, p, r, notes, count_as_customer, created_at
+                    )
+                    VALUES (?, ?, ?, ?, 0, 0, 0, NULL, 0, ?)
                     """,
                     (service_date, therapist_id, menu_id_2, quantity, now_iso()),
                 )
@@ -834,9 +838,9 @@ def create_app() -> Flask:
                 INSERT INTO treatments(
                   service_date, therapist_id, menu_id, quantity, hpb, p, r,
                   price_override, commission_type_override, commission_value_override,
-                  notes, created_at
+                  notes, count_as_customer, created_at
                 )
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?)
                 """,
                 (
                     service_date,
@@ -1001,6 +1005,7 @@ def create_app() -> Flask:
               t.commission_type_override,
               t.commission_value_override,
               t.notes,
+              t.count_as_customer,
               th.id AS therapist_id,
               th.name AS therapist_name,
               th.commission_type AS therapist_commission_type,
@@ -1043,6 +1048,11 @@ def create_app() -> Flask:
                 p_points_yen=int(r["p"] or 0),
                 r_nomination_fee_yen=int(r["r"] or 0),
             )
+            count_as_customer = (
+                int(r["count_as_customer"])
+                if r["count_as_customer"] is not None
+                else 1
+            )
 
             detail_lines.append(
                 {
@@ -1051,6 +1061,7 @@ def create_app() -> Flask:
                     "therapist_name": r["therapist_name"],
                     "menu_name": r["menu_name"],
                     "quantity": int(r["quantity"]),
+                    "count_as_customer": count_as_customer,
                     "hpb": int(r["hpb"] or 0),
                     "p": int(r["p"] or 0),
                     "r": int(r["r"] or 0),
@@ -1073,9 +1084,14 @@ def create_app() -> Flask:
                     "therapist_name": r["therapist_name"],
                     "sales_total": 0,
                     "payout_total": 0,
+                    "customer_count": 0,
                 }
             per_therapist[tid]["sales_total"] = int(per_therapist[tid]["sales_total"]) + sales
             per_therapist[tid]["payout_total"] = int(per_therapist[tid]["payout_total"]) + payout
+            if count_as_customer:
+                per_therapist[tid]["customer_count"] = int(per_therapist[tid]["customer_count"]) + int(
+                    r["quantity"]
+                )
 
         payout_rows = q(
             conn,
@@ -1102,6 +1118,7 @@ def create_app() -> Flask:
                 "therapist_name": p["therapist_name"],
                 "sales_total": 0,
                 "payout_total": int(p["paid_amount"]),
+                "customer_count": 0,
                 "paid": True,
                 "paid_amount": int(p["paid_amount"]),
                 "paid_at": p["paid_at"],
@@ -1138,11 +1155,14 @@ def create_app() -> Flask:
             w.writerow(["日付", service_date])
             w.writerow([])
             w.writerow(["セラピスト別集計"])
-            w.writerow(["セラピスト", "売上合計(円)", "支払合計(円)", "支払済み", "支払額(円)", "支払日時", "支払方法"])
+            w.writerow(
+                ["セラピスト", "客数", "売上合計(円)", "支払合計(円)", "支払済み", "支払額(円)", "支払日時", "支払方法"]
+            )
             for s in summaries:
                 w.writerow(
                     [
                         s["therapist_name"],
+                        s["customer_count"],
                         s["sales_total"],
                         s["payout_total"],
                         "済" if s["paid"] else "未",
@@ -1154,14 +1174,33 @@ def create_app() -> Flask:
 
             w.writerow([])
             w.writerow(["明細"])
-            w.writerow(["施術ID", "セラピスト", "メニュー", "数量", "HPB", "P", "R", "単価(円)", "売上(円)", "歩合タイプ", "歩合値", "支払(円)", "メモ"])
+            w.writerow(
+                [
+                    "施術ID",
+                    "セラピスト",
+                    "メニュー",
+                    "数量",
+                    "客数計上数量",
+                    "HPB",
+                    "P",
+                    "R",
+                    "単価(円)",
+                    "売上(円)",
+                    "歩合タイプ",
+                    "歩合値",
+                    "支払(円)",
+                    "メモ",
+                ]
+            )
             for d in details:
+                cust_qty = int(d["quantity"]) if int(d.get("count_as_customer") or 0) else 0
                 w.writerow(
                     [
                         d["treatment_id"],
                         d["therapist_name"],
                         d["menu_name"],
                         d["quantity"],
+                        cust_qty,
                         d["hpb"],
                         d["p"],
                         d["r"],
@@ -1247,6 +1286,7 @@ def create_app() -> Flask:
               t.commission_type_override,
               t.commission_value_override,
               t.notes,
+              t.count_as_customer,
               th.id AS therapist_id,
               th.name AS therapist_name,
               th.commission_type AS therapist_commission_type,
@@ -1285,6 +1325,11 @@ def create_app() -> Flask:
                 p_points_yen=int(r["p"] or 0),
                 r_nomination_fee_yen=int(r["r"] or 0),
             )
+            count_as_customer = (
+                int(r["count_as_customer"])
+                if r["count_as_customer"] is not None
+                else 1
+            )
             detail_lines.append({
                 "treatment_id": r["id"],
                 "therapist_id": r["therapist_id"],
@@ -1292,6 +1337,7 @@ def create_app() -> Flask:
                 "service_date": r["service_date"],
                 "menu_name": r["menu_name"],
                 "quantity": int(r["quantity"]),
+                "count_as_customer": count_as_customer,
                 "hpb": int(r["hpb"] or 0),
                 "p": int(r["p"] or 0),
                 "r": int(r["r"] or 0),
@@ -1322,10 +1368,18 @@ def create_app() -> Flask:
             for d in details:
                 tid = int(d["therapist_id"])
                 if tid not in totals:
-                    totals[tid] = {"therapist_name": d["therapist_name"], "sales": 0, "payout": 0, "count": 0}
+                    totals[tid] = {
+                        "therapist_name": d["therapist_name"],
+                        "sales": 0,
+                        "payout": 0,
+                        "line_count": 0,
+                        "customer_count": 0,
+                    }
                 totals[tid]["sales"] = int(totals[tid]["sales"]) + int(d["sales"])
                 totals[tid]["payout"] = int(totals[tid]["payout"]) + int(d["payout"])
-                totals[tid]["count"] = int(totals[tid]["count"]) + 1
+                totals[tid]["line_count"] = int(totals[tid]["line_count"]) + 1
+                if int(d.get("count_as_customer") or 0):
+                    totals[tid]["customer_count"] = int(totals[tid]["customer_count"]) + int(d["quantity"])
             therapist_totals = sorted(totals.values(), key=lambda x: str(x["therapist_name"]))
             return render_template(
                 "report_staff.html",
@@ -1351,8 +1405,25 @@ def create_app() -> Flask:
             details = _compute_staff_details(rows)
             output = io.StringIO()
             w = csv.writer(output)
-            w.writerow(["セラピスト", "日付", "メニュー", "単価(円)", "HPB割引(円)", "P割引(円)", "指名料R(円)", "売上(円)", "歩合タイプ", "歩合値", "スタッフ支払(円)", "メモ"])
+            w.writerow(
+                [
+                    "セラピスト",
+                    "日付",
+                    "メニュー",
+                    "単価(円)",
+                    "HPB割引(円)",
+                    "P割引(円)",
+                    "指名料R(円)",
+                    "売上(円)",
+                    "歩合タイプ",
+                    "歩合値",
+                    "スタッフ支払(円)",
+                    "客数計上数量",
+                    "メモ",
+                ]
+            )
             for d in details:
+                cust_qty = int(d["quantity"]) if int(d.get("count_as_customer") or 0) else 0
                 w.writerow([
                     d["therapist_name"],
                     d["service_date"],
@@ -1365,6 +1436,7 @@ def create_app() -> Flask:
                     "%" if d["rule_type"] == "percent" else "固定",
                     d["rule_value"],
                     d["payout"],
+                    cust_qty,
                     d["notes"],
                 ])
             bom = "\ufeff"

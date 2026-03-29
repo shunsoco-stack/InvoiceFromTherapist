@@ -71,7 +71,7 @@ sudo systemctl status invoice.service
 PC から入る例:
 
 ```bat
-ssh -i "C:\path\to\LightsailDefaultKey-ap-northeast-1.pem" ubuntu@35.75.205.230
+ssh -i "C:\Users\shunk\Downloads\LightsailDefaultKey-ap-northeast-1.pem" ubuntu@35.75.205.230
 ```
 
 ---
