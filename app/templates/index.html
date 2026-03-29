@@ -2,6 +2,7 @@
 {% set title = "トップ" %}
 {% block content %}
   <div class="homeSimple">
+    <div class="homeSimple__version mono" title="サーバー日付ベースの表示用バージョン">バージョン {{ app_version_date }}</div>
     {% if logo_url %}
       <div class="homeSimple__logoWrap">
         <img class="homeSimple__logo" src="{{ logo_url }}" alt="{{ logo_alt }}" />
