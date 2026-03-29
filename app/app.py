@@ -1229,6 +1229,154 @@ def create_app() -> Flask:
         finally:
             conn.close()
 
+    # ----------------
+    # Staff Report (per-therapist, date range)
+    # ----------------
+    def _staff_report_rows(conn, date_from: str, date_to: str, therapist_id: Optional[int] = None):
+        base_sql = """
+            SELECT
+              t.id,
+              t.service_date,
+              t.quantity,
+              t.hpb,
+              t.p,
+              t.r,
+              t.price_override,
+              t.commission_type_override,
+              t.commission_value_override,
+              t.notes,
+              th.id AS therapist_id,
+              th.name AS therapist_name,
+              th.commission_type AS therapist_commission_type,
+              th.commission_value AS therapist_commission_value,
+              m.id AS menu_id,
+              m.name AS menu_name,
+              m.price AS menu_price,
+              m.commission_type AS menu_commission_type,
+              m.commission_value AS menu_commission_value
+            FROM treatments t
+            JOIN therapists th ON th.id = t.therapist_id
+            JOIN menus m ON m.id = t.menu_id
+            WHERE t.service_date BETWEEN ? AND ?
+        """
+        if therapist_id:
+            return q(conn, base_sql + " AND t.therapist_id = ? ORDER BY th.name ASC, t.service_date ASC, t.id ASC", (date_from, date_to, therapist_id))
+        return q(conn, base_sql + " ORDER BY th.name ASC, t.service_date ASC, t.id ASC", (date_from, date_to))
+
+    def _compute_staff_details(rows) -> List[Dict[str, object]]:
+        detail_lines: List[Dict[str, object]] = []
+        for r in rows:
+            price = int(r["price_override"]) if r["price_override"] is not None else int(r["menu_price"])
+            rule = pick_commission_rule(
+                r["commission_type_override"],
+                r["commission_value_override"],
+                r["menu_commission_type"],
+                r["menu_commission_value"],
+                r["therapist_commission_type"],
+                r["therapist_commission_value"],
+            )
+            gross_menu, discount_total, net_menu, sales, payout = calc_treatment_yen(
+                unit_price_yen=price,
+                quantity=int(r["quantity"]),
+                rule=rule,
+                hpb_discount_yen=int(r["hpb"] or 0),
+                p_points_yen=int(r["p"] or 0),
+                r_nomination_fee_yen=int(r["r"] or 0),
+            )
+            detail_lines.append({
+                "treatment_id": r["id"],
+                "therapist_id": r["therapist_id"],
+                "therapist_name": r["therapist_name"],
+                "service_date": r["service_date"],
+                "menu_name": r["menu_name"],
+                "quantity": int(r["quantity"]),
+                "hpb": int(r["hpb"] or 0),
+                "p": int(r["p"] or 0),
+                "r": int(r["r"] or 0),
+                "price": price,
+                "gross_menu": gross_menu,
+                "discount_total": discount_total,
+                "net_menu": net_menu,
+                "sales": sales,
+                "rule_type": rule.commission_type,
+                "rule_value": rule.commission_value,
+                "payout": payout,
+                "notes": r["notes"] or "",
+            })
+        return detail_lines
+
+    @app.get("/reports/staff")
+    def report_staff():
+        today = date.today().isoformat()
+        date_from = (request.args.get("date_from") or today[:8] + "01").strip()
+        date_to = (request.args.get("date_to") or today).strip()
+        therapist_id = int(request.args.get("therapist_id") or "0")
+        conn = connect()
+        try:
+            therapists = q(conn, "SELECT * FROM therapists ORDER BY is_active DESC, name ASC, id ASC")
+            rows = _staff_report_rows(conn, date_from, date_to, therapist_id or None)
+            details = _compute_staff_details(rows)
+            totals: Dict[int, Dict[str, object]] = {}
+            for d in details:
+                tid = int(d["therapist_id"])
+                if tid not in totals:
+                    totals[tid] = {"therapist_name": d["therapist_name"], "sales": 0, "payout": 0, "count": 0}
+                totals[tid]["sales"] = int(totals[tid]["sales"]) + int(d["sales"])
+                totals[tid]["payout"] = int(totals[tid]["payout"]) + int(d["payout"])
+                totals[tid]["count"] = int(totals[tid]["count"]) + 1
+            therapist_totals = sorted(totals.values(), key=lambda x: str(x["therapist_name"]))
+            return render_template(
+                "report_staff.html",
+                date_from=date_from,
+                date_to=date_to,
+                therapist_id=therapist_id,
+                therapists=therapists,
+                details=details,
+                therapist_totals=therapist_totals,
+            )
+        finally:
+            conn.close()
+
+    @app.get("/reports/staff.csv")
+    def report_staff_csv():
+        today = date.today().isoformat()
+        date_from = (request.args.get("date_from") or today[:8] + "01").strip()
+        date_to = (request.args.get("date_to") or today).strip()
+        therapist_id = int(request.args.get("therapist_id") or "0")
+        conn = connect()
+        try:
+            rows = _staff_report_rows(conn, date_from, date_to, therapist_id or None)
+            details = _compute_staff_details(rows)
+            output = io.StringIO()
+            w = csv.writer(output)
+            w.writerow(["セラピスト", "日付", "メニュー", "単価(円)", "HPB割引(円)", "P割引(円)", "指名料R(円)", "売上(円)", "歩合タイプ", "歩合値", "スタッフ支払(円)", "メモ"])
+            for d in details:
+                w.writerow([
+                    d["therapist_name"],
+                    d["service_date"],
+                    d["menu_name"],
+                    d["price"],
+                    d["hpb"],
+                    d["p"],
+                    d["r"],
+                    d["sales"],
+                    "%" if d["rule_type"] == "percent" else "固定",
+                    d["rule_value"],
+                    d["payout"],
+                    d["notes"],
+                ])
+            bom = "\ufeff"
+            csv_bytes = (bom + output.getvalue()).encode("utf-8")
+            therapist_part = f"_t{therapist_id}" if therapist_id else "_all"
+            filename = f"staff_{date_from}_{date_to}{therapist_part}.csv"
+            return Response(
+                csv_bytes,
+                mimetype="text/csv; charset=utf-8",
+                headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+            )
+        finally:
+            conn.close()
+
     @app.post("/payouts/mark_paid")
     def payout_mark_paid():
         service_date = (request.form.get("service_date") or date.today().isoformat()).strip()

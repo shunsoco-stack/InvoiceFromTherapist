@@ -1,0 +1,99 @@
+{% extends "base.html" %}
+{% set title = "スタッフ別レポート" %}
+{% block content %}
+  <div class="page-head">
+    <h1>スタッフ別レポート</h1>
+    <p class="muted">期間とスタッフを選択して、施術ごとの詳細と支払合計をCSVで出力できます。</p>
+  </div>
+
+  <section class="card">
+    <h2>絞り込み</h2>
+    <form class="inline" method="get" action="{{ url_for('report_staff') }}">
+      <label>開始日 <input name="date_from" type="date" value="{{ date_from }}" /></label>
+      <label>終了日 <input name="date_to" type="date" value="{{ date_to }}" /></label>
+      <label>スタッフ
+        <select name="therapist_id">
+          <option value="0" {% if therapist_id == 0 %}selected{% endif %}>全員</option>
+          {% for t in therapists %}
+            <option value="{{ t.id }}" {% if therapist_id == t.id %}selected{% endif %}>{{ t.name }}</option>
+          {% endfor %}
+        </select>
+      </label>
+      <button class="btn btn--secondary" type="submit">表示</button>
+      <a class="btn" href="{{ url_for('report_staff_csv', date_from=date_from, date_to=date_to, therapist_id=therapist_id) }}">CSV出力</a>
+    </form>
+  </section>
+
+  {% if therapist_totals %}
+  <section class="card">
+    <h2>スタッフ別合計（{{ date_from }} ～ {{ date_to }}）</h2>
+    <div class="table-wrap">
+      <table class="table">
+        <thead>
+          <tr>
+            <th>スタッフ</th>
+            <th class="right">件数</th>
+            <th class="right">売上合計</th>
+            <th class="right">支払合計</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for t in therapist_totals %}
+            <tr>
+              <td>{{ t.therapist_name }}</td>
+              <td class="right mono">{{ t.count }}件</td>
+              <td class="right mono">{{ "{:,}".format(t.sales) }}円</td>
+              <td class="right mono strong">{{ "{:,}".format(t.payout) }}円</td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </section>
+  {% endif %}
+
+  <section class="card">
+    <h2>明細一覧</h2>
+    <div class="table-wrap">
+      <table class="table table--small">
+        <thead>
+          <tr>
+            <th>スタッフ</th>
+            <th>日付</th>
+            <th>メニュー</th>
+            <th class="right">単価</th>
+            <th class="right">HPB</th>
+            <th class="right">P</th>
+            <th class="right">指名料R</th>
+            <th class="right">売上</th>
+            <th class="right">支払</th>
+            <th>歩合</th>
+            <th>メモ</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for d in details %}
+            <tr>
+              <td>{{ d.therapist_name }}</td>
+              <td class="mono">{{ d.service_date }}</td>
+              <td>{{ d.menu_name }}</td>
+              <td class="right mono">{{ "{:,}".format(d.price) }}円</td>
+              <td class="right mono">{% if d.hpb %}{{ d.hpb }}{% endif %}</td>
+              <td class="right mono">{% if d.p %}{{ d.p }}{% endif %}</td>
+              <td class="right mono">{% if d.r %}{{ "{:,}".format(d.r) }}円{% endif %}</td>
+              <td class="right mono">{{ "{:,}".format(d.sales) }}円</td>
+              <td class="right mono strong">{{ "{:,}".format(d.payout) }}円</td>
+              <td class="mono">
+                {% if d.rule_type == "percent" %}{{ d.rule_value }}%{% else %}固定 {{ d.rule_value }}円{% endif %}
+              </td>
+              <td class="muted">{{ d.notes }}</td>
+            </tr>
+          {% endfor %}
+          {% if details|length == 0 %}
+            <tr><td colspan="11" class="muted">該当する施術記録がありません。</td></tr>
+          {% endif %}
+        </tbody>
+      </table>
+    </div>
+  </section>
+{% endblock %}
