@@ -2,9 +2,32 @@
 
 ## 前提
 
-- AWS CLI が入り、`aws configure` で認証済み
 - Lightsail に **コンテナサービス** が既にある（またはこれから作成）
 - コンテナの公開ポートと、Lightsail が期待する **コンテナ内ポート**（例: `5000`）を一致させる
+
+### PC に Docker が無い場合（GitHub Actions）
+
+**Docker Desktop は不要**です。GitHub のクラウド（`ubuntu-latest`）に Docker が入っているので、リポジトリの **Actions** からワークフロー **「Push container image to Lightsail」** を実行すると、ビルドと `push-container-image` まで行えます。
+
+1. GitHub リポジトリ → **Settings** → **Secrets and variables** → **Actions** → **New repository secret** で次を登録:
+
+   | Name | 値 |
+   |------|-----|
+   | `AWS_ACCESS_KEY_ID` | IAM ユーザーのアクセスキー |
+   | `AWS_SECRET_ACCESS_KEY` | シークレットキー |
+   | `AWS_REGION` | 例: `ap-northeast-1`（Lightsail と同じリージョン） |
+   | `LIGHTSAIL_SERVICE_NAME` | Lightsail コンソールに表示されている **コンテナサービス名** |
+
+2. IAM ユーザーには少なくとも Lightsail のイメージプッシュに必要な権限を付与（例: `AmazonLightsailFullAccess` で動作確認し、後で絞る）。
+
+3. **Actions** タブ → **Push container image to Lightsail** → **Run workflow**。
+
+4. 成功後、Lightsail コンソールで **新しいデプロイを作成**し、イメージ **`invoice-salon`** の最新を選ぶ（従来どおり）。
+
+### 手元で CLI から行う場合
+
+- AWS CLI が入り、`aws configure` で認証済み
+- **Docker Engine**（Linux の `docker` パッケージなど）が入っている環境。Windows では Docker Desktop が手軽だが、必須ではない
 
 ## 環境変数（Lightsail コンソールで設定）
 
