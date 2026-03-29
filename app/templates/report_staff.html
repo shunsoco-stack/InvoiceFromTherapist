@@ -20,7 +20,7 @@
         </select>
       </label>
       <button class="btn btn--secondary" type="submit">表示</button>
-      <a class="btn" href="{{ url_for('report_staff_csv', date_from=date_from, date_to=date_to, therapist_id=therapist_id) }}">CSV出力</a>
+      <button class="btn" type="submit" formaction="{{ url_for('report_staff_csv') }}" formmethod="get">CSV出力</button>
     </form>
   </section>
 
