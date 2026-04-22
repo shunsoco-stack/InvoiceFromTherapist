@@ -39,7 +39,7 @@
     </div>
 
     <h3 style="margin-top:16px;">Salesops_v3 連携用：日別売上CSV</h3>
-    <p class="muted">指定期間の「発生日／売上／客数／HPB割引合計／P割引合計」を日別集計でCSV出力します（Salesops_v3 のCSV取込でそのまま取り込めます）。</p>
+    <p class="muted">指定期間の「発生日（YYYY/MM/DD）／売上／客数」を日別集計でCSV出力します（Salesops_v3 のCSV取込向けフォーマット）。</p>
     <form class="inline" method="get" action="{{ url_for('report_sales_daily_csv') }}">
       <label>開始日 <input name="date_from" type="date" value="{{ today[:8] }}01" /></label>
       <label>終了日 <input name="date_to" type="date" value="{{ today }}" /></label>
