@@ -37,6 +37,14 @@
       <a class="btn" href="{{ url_for('report_payouts_csv') }}">支払CSV / การจ่าย</a>
       <a class="btn" href="{{ url_for('report_staff') }}">スタッフ別レポート・CSV出力</a>
     </div>
+
+    <h3 style="margin-top:16px;">Salesops_v3 連携用：日別売上CSV</h3>
+    <p class="muted">指定期間の「発生日／売上／客数／HPB割引合計／P割引合計」を日別集計でCSV出力します（Salesops_v3 のCSV取込でそのまま取り込めます）。</p>
+    <form class="inline" method="get" action="{{ url_for('report_sales_daily_csv') }}">
+      <label>開始日 <input name="date_from" type="date" value="{{ today[:8] }}01" /></label>
+      <label>終了日 <input name="date_to" type="date" value="{{ today }}" /></label>
+      <button class="btn" type="submit">日別売上CSVを出力</button>
+    </form>
   </section>
 
   <section id="supplies" class="card">

@@ -21,7 +21,9 @@
       </label>
       <button class="btn btn--secondary" type="submit">表示</button>
       <button class="btn" type="submit" formaction="{{ url_for('report_staff_csv') }}" formmethod="get">CSV出力</button>
+      <button class="btn" type="submit" formaction="{{ url_for('report_sales_daily_csv') }}" formmethod="get">日別売上CSV（Salesops連携用）</button>
     </form>
+    <p class="muted small">※「日別売上CSV」は発生日・売上・客数・HPB割引合計・P割引合計の5列をSalesops_v3で取り込める形式で出力します。</p>
   </section>
 
   {% if therapist_totals %}

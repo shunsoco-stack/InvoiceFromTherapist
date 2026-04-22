@@ -1451,6 +1451,53 @@ def create_app() -> Flask:
         finally:
             conn.close()
 
+    @app.get("/reports/sales_daily.csv")
+    def report_sales_daily_csv():
+        """Salesops_v3 への取込用：期間内の日別売上・客数・HPB/P割引合計をCSV出力する。
+
+        出力ヘッダ: 発生日, 売上, 客数, HPB割引合計, P割引合計
+        - 売上: 期間内施術の sales 合計（= net_menu + R、HPB/P 控除後）
+        - 客数: count_as_customer=1 の施術に限り quantity を加算
+        - HPB割引合計 / P割引合計: 参考値（Salesops_v3 側の取込対象外）
+        """
+        today = date.today().isoformat()
+        date_from = (request.args.get("date_from") or today[:8] + "01").strip()
+        date_to = (request.args.get("date_to") or today).strip()
+        conn = connect()
+        try:
+            rows = _staff_report_rows(conn, date_from, date_to, None)
+            details = _compute_staff_details(rows)
+
+            daily: Dict[str, Dict[str, int]] = {}
+            for d in details:
+                key = str(d["service_date"])
+                bucket = daily.setdefault(
+                    key, {"sales": 0, "customers": 0, "hpb": 0, "p": 0}
+                )
+                bucket["sales"] += int(d["sales"])
+                if int(d.get("count_as_customer") or 0):
+                    bucket["customers"] += int(d["quantity"])
+                bucket["hpb"] += int(d["hpb"] or 0)
+                bucket["p"] += int(d["p"] or 0)
+
+            output = io.StringIO()
+            w = csv.writer(output)
+            w.writerow(["発生日", "売上", "客数", "HPB割引合計", "P割引合計"])
+            for day in sorted(daily.keys()):
+                b = daily[day]
+                w.writerow([day, b["sales"], b["customers"], b["hpb"], b["p"]])
+
+            bom = "\ufeff"
+            csv_bytes = (bom + output.getvalue()).encode("utf-8")
+            filename = f"sales_daily_{date_from}_{date_to}.csv"
+            return Response(
+                csv_bytes,
+                mimetype="text/csv; charset=utf-8",
+                headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+            )
+        finally:
+            conn.close()
+
     @app.post("/payouts/mark_paid")
     def payout_mark_paid():
         service_date = (request.form.get("service_date") or date.today().isoformat()).strip()
