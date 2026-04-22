@@ -45,6 +45,12 @@
       <label>終了日 <input name="date_to" type="date" value="{{ today }}" /></label>
       <button class="btn" type="submit">日別売上CSVを出力</button>
     </form>
+    <form class="inline" method="post" action="{{ url_for('report_sales_daily_missing_csv') }}" enctype="multipart/form-data" style="margin-top:10px;">
+      <label>開始日 <input name="date_from" type="date" value="{{ today[:8] }}01" /></label>
+      <label>終了日 <input name="date_to" type="date" value="{{ today }}" /></label>
+      <label>既存CSV <input name="existing_csv" type="file" accept=".csv,text/csv" required /></label>
+      <button class="btn btn--secondary" type="submit">未登録日だけCSV出力</button>
+    </form>
   </section>
 
   <section id="supplies" class="card">

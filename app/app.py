@@ -1494,6 +1494,100 @@ def create_app() -> Flask:
         finally:
             conn.close()
 
+    def _normalize_sales_date(raw: str) -> Optional[str]:
+        v = (raw or "").strip()
+        if not v:
+            return None
+        for sep in ("T", " "):
+            if sep in v:
+                v = v.split(sep, 1)[0]
+        v = v.replace(".", "/").replace("-", "/")
+        for fmt in ("%Y/%m/%d", "%Y%m%d"):
+            try:
+                return datetime.strptime(v, fmt).date().isoformat()
+            except ValueError:
+                continue
+        try:
+            parts = [p for p in v.split("/") if p]
+            if len(parts) == 3:
+                y = int(parts[0])
+                m = int(parts[1])
+                d = int(parts[2])
+                return date(y, m, d).isoformat()
+        except ValueError:
+            return None
+        return None
+
+    def _extract_existing_sales_dates(uploaded_bytes: bytes) -> set[str]:
+        if not uploaded_bytes:
+            return set()
+        text = ""
+        for enc in ("utf-8-sig", "cp932", "utf-8"):
+            try:
+                text = uploaded_bytes.decode(enc)
+                break
+            except UnicodeDecodeError:
+                continue
+        if not text:
+            return set()
+        reader = csv.DictReader(io.StringIO(text))
+        if not reader.fieldnames:
+            return set()
+        candidates = ("発生日", "日付", "対象日", "date", "Date")
+        date_col = next((name for name in candidates if name in reader.fieldnames), reader.fieldnames[0])
+        existing: set[str] = set()
+        for row in reader:
+            raw = (row.get(date_col) or "").strip()
+            norm = _normalize_sales_date(raw)
+            if norm:
+                existing.add(norm)
+        return existing
+
+    @app.post("/reports/sales_daily_missing.csv")
+    def report_sales_daily_missing_csv():
+        """Salesops 側の既存CSVを照合し、未登録日のみ日別売上CSVを出力する。"""
+        today = date.today().isoformat()
+        date_from = (request.form.get("date_from") or today[:8] + "01").strip()
+        date_to = (request.form.get("date_to") or today).strip()
+        existing_file = request.files.get("existing_csv")
+        if not existing_file or not (existing_file.filename or "").strip():
+            flash("既存CSVファイルを選択してください。", "error")
+            return redirect(request.referrer or url_for("admin"))
+
+        existing_dates = _extract_existing_sales_dates(existing_file.read())
+        conn = connect()
+        try:
+            rows = _staff_report_rows(conn, date_from, date_to, None)
+            details = _compute_staff_details(rows)
+
+            daily: Dict[str, Dict[str, int]] = {}
+            for d in details:
+                key = str(d["service_date"])
+                bucket = daily.setdefault(key, {"sales": 0, "customers": 0})
+                bucket["sales"] += int(d["sales"])
+                if int(d.get("count_as_customer") or 0):
+                    bucket["customers"] += int(d["quantity"])
+
+            output = io.StringIO()
+            w = csv.writer(output)
+            w.writerow(["発生日", "売上", "客数"])
+            for day in sorted(daily.keys()):
+                if day in existing_dates:
+                    continue
+                b = daily[day]
+                day_slash = day.replace("-", "/")
+                w.writerow([day_slash, b["sales"], b["customers"]])
+
+            csv_bytes = output.getvalue().encode("utf-8")
+            filename = f"sales_daily_missing_{date_from}_{date_to}.csv"
+            return Response(
+                csv_bytes,
+                mimetype="text/csv; charset=utf-8",
+                headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+            )
+        finally:
+            conn.close()
+
     @app.post("/payouts/mark_paid")
     def payout_mark_paid():
         service_date = (request.form.get("service_date") or date.today().isoformat()).strip()
