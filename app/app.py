@@ -8,6 +8,7 @@ import os
 from flask import Flask, Response, flash, redirect, render_template, request, url_for
 
 from app.calc import calc_payout_yen, calc_treatment_yen, pick_commission_rule
+from app.csv_import import extract_existing_sales_dates
 from app.db import connect, exec1, init_db, now_iso, q, q1
 
 
@@ -1500,58 +1501,9 @@ def create_app() -> Flask:
         finally:
             conn.close()
 
-    def _normalize_sales_date(raw: str) -> Optional[str]:
-        v = (raw or "").strip()
-        if not v:
-            return None
-        for sep in ("T", " "):
-            if sep in v:
-                v = v.split(sep, 1)[0]
-        v = v.replace(".", "/").replace("-", "/")
-        for fmt in ("%Y/%m/%d", "%Y%m%d"):
-            try:
-                return datetime.strptime(v, fmt).date().isoformat()
-            except ValueError:
-                continue
-        try:
-            parts = [p for p in v.split("/") if p]
-            if len(parts) == 3:
-                y = int(parts[0])
-                m = int(parts[1])
-                d = int(parts[2])
-                return date(y, m, d).isoformat()
-        except ValueError:
-            return None
-        return None
-
-    def _extract_existing_sales_dates(uploaded_bytes: bytes) -> set[str]:
-        if not uploaded_bytes:
-            return set()
-        text = ""
-        for enc in ("utf-8-sig", "cp932", "utf-8"):
-            try:
-                text = uploaded_bytes.decode(enc)
-                break
-            except UnicodeDecodeError:
-                continue
-        if not text:
-            return set()
-        reader = csv.DictReader(io.StringIO(text))
-        if not reader.fieldnames:
-            return set()
-        candidates = ("発生日", "日付", "対象日", "date", "Date")
-        date_col = next((name for name in candidates if name in reader.fieldnames), reader.fieldnames[0])
-        existing: set[str] = set()
-        for row in reader:
-            raw = (row.get(date_col) or "").strip()
-            norm = _normalize_sales_date(raw)
-            if norm:
-                existing.add(norm)
-        return existing
-
     @app.post("/reports/sales_daily_missing.csv")
     def report_sales_daily_missing_csv():
-        """Salesops 側の既存CSVを照合し、未登録日のみ日別売上CSVを出力する。"""
+        """Salesops/カード明細CSVを照合し、未登録日のみ日別売上CSVを出力する。"""
         today = date.today().isoformat()
         date_from = (request.form.get("date_from") or today[:8] + "01").strip()
         date_to = (request.form.get("date_to") or today).strip()
@@ -1560,7 +1512,7 @@ def create_app() -> Flask:
             flash("既存CSVファイルを選択してください。", "error")
             return redirect(request.referrer or url_for("admin"))
 
-        existing_dates = _extract_existing_sales_dates(existing_file.read())
+        existing_dates = extract_existing_sales_dates(existing_file.read())
         conn = connect()
         try:
             rows = _staff_report_rows(conn, date_from, date_to, None)
@@ -1651,4 +1603,3 @@ app = create_app()
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=5000, debug=True)
-
