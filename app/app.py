@@ -1626,6 +1626,44 @@ def create_app() -> Flask:
         finally:
             conn.close()
 
+    @app.post("/payouts/mark_paid_all")
+    def payout_mark_paid_all():
+        service_date = (request.form.get("service_date") or date.today().isoformat()).strip()
+        method = (request.form.get("method") or "").strip() or "一括"
+        notes = (request.form.get("notes") or "").strip() or "一括支払済"
+
+        conn = connect()
+        try:
+            summaries, _ = _compute_daily_summary(conn, service_date)
+            unpaid = [s for s in summaries if not s.get("paid")]
+            if not unpaid:
+                flash("支払い済みにする未払いの集計がありません。", "error")
+                return redirect(url_for("report_daily", date=service_date))
+
+            now = datetime.now().replace(microsecond=0).isoformat()
+            for s in unpaid:
+                conn.execute(
+                    """
+                    INSERT INTO payouts(service_date, therapist_id, paid_amount, paid_at, method, notes)
+                    VALUES (?, ?, ?, ?, ?, ?)
+                    ON CONFLICT(service_date, therapist_id)
+                    DO UPDATE SET paid_amount=excluded.paid_amount, paid_at=excluded.paid_at, method=excluded.method, notes=excluded.notes
+                    """,
+                    (
+                        service_date,
+                        int(s["therapist_id"]),
+                        int(s["payout_total"]),
+                        now,
+                        method,
+                        notes,
+                    ),
+                )
+            conn.commit()
+            flash(f"{len(unpaid)}件を支払い済みにしました。", "ok")
+            return redirect(url_for("report_daily", date=service_date))
+        finally:
+            conn.close()
+
     @app.post("/payouts/unmark_paid")
     def payout_unmark_paid():
         service_date = (request.form.get("service_date") or date.today().isoformat()).strip()

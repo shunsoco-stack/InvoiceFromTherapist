@@ -20,6 +20,18 @@
 
   <section class="card">
     <h2>セラピスト別集計（{{ service_date }}）</h2>
+    {% set unpaid = namespace(count=0) %}
+    {% for s in summaries %}
+      {% if not s.paid %}
+        {% set unpaid.count = unpaid.count + 1 %}
+      {% endif %}
+    {% endfor %}
+    {% if unpaid.count > 0 %}
+      <form class="actions" method="post" action="{{ url_for('payout_mark_paid_all') }}">
+        <input type="hidden" name="service_date" value="{{ service_date }}" />
+        <button class="btn" type="submit">まとめて支払済にする</button>
+      </form>
+    {% endif %}
     <div class="table-wrap">
       <table class="table">
         <thead>
