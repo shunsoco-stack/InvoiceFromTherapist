@@ -49,11 +49,9 @@ def create_app() -> Flask:
         logo_filename = _find_logo_filename()
         logo_url = url_for("static", filename=logo_filename) if logo_filename else None
         logo_alt = (os.getenv("SALON_LOGO_ALT") or "ロゴ").strip() or "ロゴ"
-        app_version_date = date.today().isoformat()
         return render_template(
             "index.html",
             today=today,
-            app_version_date=app_version_date,
             logo_url=logo_url,
             logo_alt=logo_alt,
             supply_alerts_count=supply_alerts_count,
