@@ -4,13 +4,12 @@ from app.calc import CommissionRule, calc_treatment_yen
 
 
 class CalcTests(unittest.TestCase):
-    def test_coupon_discount_reduces_percent_commission_base(self):
+    def test_hpb_discount_reduces_percent_commission_base(self):
         gross, discount, net, sales, payout = calc_treatment_yen(
             unit_price_yen=10000,
             quantity=1,
             rule=CommissionRule("percent", 50),
-            coupon_discount_yen=1000,
-            hpb_discount_yen=500,
+            hpb_discount_yen=1500,
             p_points_yen=200,
             r_nomination_fee_yen=1000,
         )
@@ -21,13 +20,12 @@ class CalcTests(unittest.TestCase):
         self.assertEqual(sales, 9300)
         self.assertEqual(payout, 5150)
 
-    def test_coupon_discount_is_per_quantity(self):
+    def test_hpb_discount_is_total_amount(self):
         _, discount, net, sales, payout = calc_treatment_yen(
             unit_price_yen=5000,
             quantity=2,
             rule=CommissionRule("percent", 50),
-            coupon_discount_yen=500,
-            hpb_discount_yen=0,
+            hpb_discount_yen=1000,
             p_points_yen=0,
             r_nomination_fee_yen=0,
         )

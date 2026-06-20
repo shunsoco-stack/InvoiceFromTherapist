@@ -352,9 +352,9 @@
           return { type: 'percent', value: 50 };
         }
 
-        function calcTreatment(price, couponDiscount, rule, hpb, p, r) {
+        function calcTreatment(price, rule, hpb, p, r) {
           const gross = Math.max(0, Math.trunc(price));
-          const discount = Math.max(0, Math.trunc(couponDiscount)) + Math.max(0, Math.trunc(hpb)) + Math.max(0, Math.trunc(p));
+          const discount = Math.max(0, Math.trunc(hpb)) + Math.max(0, Math.trunc(p));
           const net = Math.max(0, gross - discount);
           let staffMenu = 0;
           if (rule.type === 'fixed') {
@@ -408,6 +408,17 @@
           }
         }
 
+        function syncCouponDiscountToHpb() {
+          if (!hpbInput) {
+            return;
+          }
+          const menu1 = getMenuData(menuSelect1);
+          const menu2 = getMenuData(menuSelect2);
+          const couponTotal = Math.max(0, Math.trunc(menu1?.couponDiscount || 0)) +
+                              Math.max(0, Math.trunc(menu2?.couponDiscount || 0));
+          hpbInput.value = couponTotal > 0 ? String(couponTotal) : '';
+        }
+
         function updateEstimate() {
           if (!estimateMenu1) {
             return;
@@ -423,13 +434,13 @@
           const p = readNumber(pInput?.value);
           const r = readNumber(rSelect?.value);
           const rule1 = pickRule(menu1.commissionType, menu1.commissionValue, therapistRule.type, therapistRule.value);
-          const result1 = calcTreatment(menu1.price, menu1.couponDiscount, rule1, hpb, p, r);
+          const result1 = calcTreatment(menu1.price, rule1, hpb, p, r);
 
           let result2 = null;
           const menu2 = getMenuData(menuSelect2);
           if (menu2) {
             const rule2 = pickRule(menu2.commissionType, menu2.commissionValue, therapistRule.type, therapistRule.value);
-            result2 = calcTreatment(menu2.price, menu2.couponDiscount, rule2, 0, 0, 0);
+            result2 = calcTreatment(menu2.price, rule2, 0, 0, 0);
           }
 
           estimateMenu1.textContent = formatYen(result1.sales);
@@ -529,11 +540,13 @@
         menuSelect1.addEventListener('change', () => {
           if (menuSelect1.value) {
             showMenu2AndActions();
+            syncCouponDiscountToHpb();
             updateEstimate();
           }
         });
 
         menuSelect2.addEventListener('change', () => {
+          syncCouponDiscountToHpb();
           updateEstimate();
         });
 
