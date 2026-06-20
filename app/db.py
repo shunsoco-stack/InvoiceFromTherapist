@@ -19,6 +19,7 @@ CREATE TABLE IF NOT EXISTS therapists (
 
 CREATE TABLE IF NOT EXISTS menus (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
+  display_id INTEGER,
   name TEXT NOT NULL,
   price INTEGER NOT NULL, -- yen
   commission_type TEXT,   -- nullable: fallback to therapist
@@ -108,6 +109,7 @@ def init_db() -> None:
         _ensure_column(conn, table="treatments", column="p", col_def="INTEGER NOT NULL DEFAULT 0")
         _ensure_column(conn, table="treatments", column="r", col_def="INTEGER NOT NULL DEFAULT 0")
         _ensure_count_as_customer_column(conn)
+        _ensure_menu_display_id_column(conn)
         conn.commit()
     finally:
         conn.close()
@@ -124,6 +126,14 @@ def _ensure_count_as_customer_column(conn: sqlite3.Connection) -> None:
     conn.execute(
         "UPDATE treatments SET count_as_customer = 1 WHERE count_as_customer IS NULL",
     )
+
+
+def _ensure_menu_display_id_column(conn: sqlite3.Connection) -> None:
+    cols = q(conn, "PRAGMA table_info(menus)")
+    existing = {str(r["name"]) for r in cols}
+    if "display_id" not in existing:
+        conn.execute("ALTER TABLE menus ADD COLUMN display_id INTEGER")
+    conn.execute("UPDATE menus SET display_id = id WHERE display_id IS NULL")
 
 
 def _ensure_column(conn: sqlite3.Connection, table: str, column: str, col_def: str) -> None:
@@ -154,4 +164,3 @@ def exec1(conn: sqlite3.Connection, sql: str, args: Tuple[Any, ...] = ()) -> int
 
 def now_iso() -> str:
     return _utc_iso()
-

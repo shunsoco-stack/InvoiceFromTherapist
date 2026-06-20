@@ -11,7 +11,7 @@
     <form class="form" method="post" action="{{ url_for('menus_new') }}">
       <div class="form-row">
         <label>ID（任意）</label>
-        <input name="menu_id" type="number" inputmode="numeric" min="1" placeholder="空欄なら自動" />
+        <input name="display_id" type="number" inputmode="numeric" min="1" placeholder="空欄なら自動" />
         <div class="help muted">任意の番号を指定できます。空欄の場合は自動採番です。</div>
       </div>
       <div class="form-row">
@@ -65,7 +65,7 @@
         <tbody>
           {% for m in menus %}
             <tr>
-              <td class="mono">{{ m.id }}</td>
+              <td class="mono">{{ m.display_id }}</td>
               <td>{{ m.name }}</td>
               <td class="mono">{{ "{:,}".format(m.price) }}円</td>
               <td class="mono">
