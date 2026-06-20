@@ -9,6 +9,11 @@
   <section class="card">
     <form class="form" method="post" action="{{ url_for('menus_edit_post', menu_id=menu.id) }}">
       <div class="form-row">
+        <label>ID</label>
+        <input name="menu_id" type="number" inputmode="numeric" min="1" value="{{ menu.id }}" required />
+        <div class="help muted">変更すると、このメニューを使った過去の施術履歴も新しいIDに付け替わります。</div>
+      </div>
+      <div class="form-row">
         <label>メニュー名</label>
         <input name="name" value="{{ menu.name }}" required />
       </div>

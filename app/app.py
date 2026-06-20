@@ -404,7 +404,7 @@ def create_app() -> Flask:
             service_date = str(t["service_date"])
 
             therapists = q(conn, "SELECT * FROM therapists ORDER BY is_active DESC, name ASC, id ASC")
-            menus = q(conn, "SELECT * FROM menus ORDER BY is_active DESC, name ASC, id ASC")
+            menus = q(conn, "SELECT * FROM menus ORDER BY is_active DESC, id ASC")
             return render_template(
                 "kiosk_edit.html",
                 service_date=service_date,
@@ -646,10 +646,14 @@ def create_app() -> Flask:
     # ----------------
     @app.get("/menus")
     def menus_list():
+        order = (request.args.get("order") or "asc").strip().lower()
+        if order not in ("asc", "desc"):
+            order = "asc"
+        sort_dir = "DESC" if order == "desc" else "ASC"
         conn = connect()
         try:
-            rows = q(conn, "SELECT * FROM menus ORDER BY is_active DESC, name ASC, id ASC")
-            return render_template("menus_list.html", menus=rows)
+            rows = q(conn, f"SELECT * FROM menus ORDER BY is_active DESC, id {sort_dir}")
+            return render_template("menus_list.html", menus=rows, order=order)
         finally:
             conn.close()
 
@@ -667,6 +671,7 @@ def create_app() -> Flask:
 
     @app.post("/menus/<int:menu_id>/edit")
     def menus_edit_post(menu_id: int):
+        new_menu_id = int(request.form.get("menu_id") or "0")
         name = (request.form.get("name") or "").strip()
         price = int(request.form.get("price") or "0")
         is_active = 1 if (request.form.get("is_active") == "on") else 0
@@ -677,6 +682,9 @@ def create_app() -> Flask:
 
         if not name:
             flash("メニュー名は必須です。", "error")
+            return redirect(url_for("menus_edit", menu_id=menu_id))
+        if new_menu_id <= 0:
+            flash("IDは1以上の番号で入力してください。", "error")
             return redirect(url_for("menus_edit", menu_id=menu_id))
         if price < 0:
             flash("金額が不正です。", "error")
@@ -689,18 +697,44 @@ def create_app() -> Flask:
 
         conn = connect()
         try:
-            m = q1(conn, "SELECT id FROM menus WHERE id = ?", (menu_id,))
+            m = q1(conn, "SELECT * FROM menus WHERE id = ?", (menu_id,))
             if not m:
                 flash("対象のメニューが見つかりません。", "error")
                 return redirect(url_for("menus_list"))
-            conn.execute(
-                """
-                UPDATE menus
-                SET name = ?, price = ?, commission_type = ?, commission_value = ?, is_active = ?
-                WHERE id = ?
-                """,
-                (name, price, commission_type, commission_value, is_active, menu_id),
-            )
+
+            if new_menu_id != menu_id:
+                duplicate = q1(conn, "SELECT id FROM menus WHERE id = ?", (new_menu_id,))
+                if duplicate:
+                    flash("指定したIDは既に使われています。", "error")
+                    return redirect(url_for("menus_edit", menu_id=menu_id))
+
+                conn.execute("BEGIN")
+                conn.execute(
+                    """
+                    INSERT INTO menus(id, name, price, commission_type, commission_value, is_active, created_at)
+                    VALUES (?, ?, ?, ?, ?, ?, ?)
+                    """,
+                    (
+                        new_menu_id,
+                        name,
+                        price,
+                        commission_type,
+                        commission_value,
+                        is_active,
+                        m["created_at"],
+                    ),
+                )
+                conn.execute("UPDATE treatments SET menu_id = ? WHERE menu_id = ?", (new_menu_id, menu_id))
+                conn.execute("DELETE FROM menus WHERE id = ?", (menu_id,))
+            else:
+                conn.execute(
+                    """
+                    UPDATE menus
+                    SET name = ?, price = ?, commission_type = ?, commission_value = ?, is_active = ?
+                    WHERE id = ?
+                    """,
+                    (name, price, commission_type, commission_value, is_active, menu_id),
+                )
             conn.commit()
             flash("メニューを更新しました。", "ok")
             return redirect(url_for("menus_list"))
@@ -709,6 +743,8 @@ def create_app() -> Flask:
 
     @app.post("/menus/new")
     def menus_new():
+        menu_id_raw = (request.form.get("menu_id") or "").strip()
+        menu_id = int(menu_id_raw) if menu_id_raw else None
         name = (request.form.get("name") or "").strip()
         price = int(request.form.get("price") or "0")
         is_active = 1 if (request.form.get("is_active") == "on") else 0
@@ -720,6 +756,9 @@ def create_app() -> Flask:
         if not name:
             flash("メニュー名は必須です。", "error")
             return redirect(url_for("menus_list"))
+        if menu_id is not None and menu_id <= 0:
+            flash("IDは1以上の番号で入力してください。", "error")
+            return redirect(url_for("menus_list"))
         if price < 0:
             flash("金額が不正です。", "error")
             return redirect(url_for("menus_list"))
@@ -729,14 +768,28 @@ def create_app() -> Flask:
 
         conn = connect()
         try:
-            exec1(
-                conn,
-                """
-                INSERT INTO menus(name, price, commission_type, commission_value, is_active, created_at)
-                VALUES (?, ?, ?, ?, ?, ?)
-                """,
-                (name, price, commission_type, commission_value, is_active, now_iso()),
-            )
+            if menu_id is not None:
+                duplicate = q1(conn, "SELECT id FROM menus WHERE id = ?", (menu_id,))
+                if duplicate:
+                    flash("指定したIDは既に使われています。", "error")
+                    return redirect(url_for("menus_list"))
+                exec1(
+                    conn,
+                    """
+                    INSERT INTO menus(id, name, price, commission_type, commission_value, is_active, created_at)
+                    VALUES (?, ?, ?, ?, ?, ?, ?)
+                    """,
+                    (menu_id, name, price, commission_type, commission_value, is_active, now_iso()),
+                )
+            else:
+                exec1(
+                    conn,
+                    """
+                    INSERT INTO menus(name, price, commission_type, commission_value, is_active, created_at)
+                    VALUES (?, ?, ?, ?, ?, ?)
+                    """,
+                    (name, price, commission_type, commission_value, is_active, now_iso()),
+                )
             flash("メニューを追加しました。", "ok")
             return redirect(url_for("menus_list"))
         finally:
@@ -763,7 +816,7 @@ def create_app() -> Flask:
     # ----------------
     def _load_active_therapists_and_menus(conn):
         therapists = q(conn, "SELECT * FROM therapists WHERE is_active = 1 ORDER BY name ASC, id ASC")
-        menus = q(conn, "SELECT * FROM menus WHERE is_active = 1 ORDER BY name ASC, id ASC")
+        menus = q(conn, "SELECT * FROM menus WHERE is_active = 1 ORDER BY id ASC")
         return therapists, menus
 
     @app.get("/treatments")
@@ -895,7 +948,7 @@ def create_app() -> Flask:
                 return redirect(url_for("treatments_list"))
 
             therapists = q(conn, "SELECT * FROM therapists ORDER BY is_active DESC, name ASC, id ASC")
-            menus = q(conn, "SELECT * FROM menus ORDER BY is_active DESC, name ASC, id ASC")
+            menus = q(conn, "SELECT * FROM menus ORDER BY is_active DESC, id ASC")
 
             return render_template(
                 "treatments_edit.html",
