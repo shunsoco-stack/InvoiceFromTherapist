@@ -69,6 +69,7 @@ def calc_treatment_yen(
     unit_price_yen: int,
     quantity: int,
     rule: CommissionRule,
+    coupon_discount_yen: int,
     hpb_discount_yen: int,
     p_points_yen: int,
     r_nomination_fee_yen: int,
@@ -78,6 +79,7 @@ def calc_treatment_yen(
       (gross_menu_yen, discount_total_yen, net_menu_yen, sales_total_yen, staff_total_yen)
 
     Meanings:
+    - coupon_discount_yen: menu-level coupon discount per treatment item
     - HPB: coupon discount amount (reduces customer payment)
     - P: points used amount (reduces customer payment)
     - R: nomination fee (adds to sales AND 100% paid to staff)
@@ -90,9 +92,10 @@ def calc_treatment_yen(
     unit_price = max(0, int(unit_price_yen))
     gross_menu = unit_price * q
 
+    coupon = max(0, int(coupon_discount_yen)) * q
     hpb = max(0, int(hpb_discount_yen))
     pts = max(0, int(p_points_yen))
-    discount_total = hpb + pts
+    discount_total = coupon + hpb + pts
     net_menu = max(0, gross_menu - discount_total)
 
     if rule.commission_type == "fixed":

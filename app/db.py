@@ -22,6 +22,7 @@ CREATE TABLE IF NOT EXISTS menus (
   display_id INTEGER,
   name TEXT NOT NULL,
   price INTEGER NOT NULL, -- yen
+  coupon_discount INTEGER NOT NULL DEFAULT 0, -- yen per treatment item
   commission_type TEXT,   -- nullable: fallback to therapist
   commission_value INTEGER,
   is_active INTEGER NOT NULL DEFAULT 1,
@@ -110,6 +111,7 @@ def init_db() -> None:
         _ensure_column(conn, table="treatments", column="r", col_def="INTEGER NOT NULL DEFAULT 0")
         _ensure_count_as_customer_column(conn)
         _ensure_menu_display_id_column(conn)
+        _ensure_column(conn, table="menus", column="coupon_discount", col_def="INTEGER NOT NULL DEFAULT 0")
         conn.commit()
     finally:
         conn.close()

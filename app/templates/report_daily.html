@@ -88,6 +88,7 @@
             <th class="right">P</th>
             <th class="right">R</th>
             <th class="right">単価</th>
+            <th class="right">クーポン</th>
             <th class="right">売上</th>
             <th class="right">支払</th>
             <th>歩合</th>
@@ -106,6 +107,7 @@
               <td class="right mono">{{ d.p }}</td>
               <td class="right mono">{{ d.r }}</td>
               <td class="right mono">{{ "{:,}".format(d.price) }}円</td>
+              <td class="right mono">{{ d.coupon_discount }}</td>
               <td class="right mono">{{ "{:,}".format(d.sales) }}円</td>
               <td class="right mono strong">{{ "{:,}".format(d.payout) }}円</td>
               <td class="mono">
@@ -119,11 +121,10 @@
             </tr>
           {% endfor %}
           {% if details|length == 0 %}
-            <tr><td colspan="13" class="muted">明細がありません。</td></tr>
+            <tr><td colspan="14" class="muted">明細がありません。</td></tr>
           {% endif %}
         </tbody>
       </table>
     </div>
   </section>
 {% endblock %}
-

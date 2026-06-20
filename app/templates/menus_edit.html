@@ -22,6 +22,10 @@
         <input name="price" type="number" inputmode="numeric" min="0" value="{{ menu.price }}" />
       </div>
       <div class="form-row">
+        <label>クーポン割引額（円）</label>
+        <input name="coupon_discount" type="number" inputmode="numeric" min="0" value="{{ menu.coupon_discount or 0 }}" />
+      </div>
+      <div class="form-row">
         <label>メニュー別歩合（任意）</label>
         <div class="inline">
           <select name="commission_type">

@@ -108,6 +108,7 @@ def create_app() -> Flask:
             therapists, menus = _load_active_therapists_and_menus(conn)
             summaries, details = _compute_daily_summary(conn, service_date)
             items_by_therapist = _kiosk_items_by_therapist(details)
+            coupon_totals = _kiosk_coupon_totals(details)
             hpb_totals = _kiosk_hpb_totals(details)
             p_totals = _kiosk_p_totals(details)
             r_totals = _kiosk_r_totals(details)
@@ -141,6 +142,7 @@ def create_app() -> Flask:
                 menus=menus,
                 summaries=summaries,
                 items_by_therapist=items_by_therapist,
+                coupon_totals=coupon_totals,
                 hpb_totals=hpb_totals,
                 p_totals=p_totals,
                 r_totals=r_totals,
@@ -554,6 +556,13 @@ def create_app() -> Flask:
             totals[tid] = int(totals.get(tid, 0)) + int(d.get("hpb", 0))
         return totals
 
+    def _kiosk_coupon_totals(details: List[Dict[str, object]]) -> Dict[int, int]:
+        totals: Dict[int, int] = {}
+        for d in details:
+            tid = int(d["therapist_id"])
+            totals[tid] = int(totals.get(tid, 0)) + int(d.get("coupon_discount", 0))
+        return totals
+
     def _kiosk_p_totals(details: List[Dict[str, object]]) -> Dict[int, int]:
         totals: Dict[int, int] = {}
         for d in details:
@@ -674,6 +683,7 @@ def create_app() -> Flask:
         display_id = int(request.form.get("display_id") or "0")
         name = (request.form.get("name") or "").strip()
         price = int(request.form.get("price") or "0")
+        coupon_discount = int(request.form.get("coupon_discount") or "0")
         is_active = 1 if (request.form.get("is_active") == "on") else 0
 
         commission_type = (request.form.get("commission_type") or "").strip() or None
@@ -688,6 +698,9 @@ def create_app() -> Flask:
             return redirect(url_for("menus_edit", menu_id=menu_id))
         if price < 0:
             flash("金額が不正です。", "error")
+            return redirect(url_for("menus_edit", menu_id=menu_id))
+        if coupon_discount < 0:
+            flash("クーポン割引額が不正です。", "error")
             return redirect(url_for("menus_edit", menu_id=menu_id))
         if commission_type is not None and commission_type not in ("percent", "fixed"):
             flash("歩合タイプが不正です。", "error")
@@ -705,10 +718,10 @@ def create_app() -> Flask:
             conn.execute(
                 """
                 UPDATE menus
-                SET display_id = ?, name = ?, price = ?, commission_type = ?, commission_value = ?, is_active = ?
+                SET display_id = ?, name = ?, price = ?, coupon_discount = ?, commission_type = ?, commission_value = ?, is_active = ?
                 WHERE id = ?
                 """,
-                (display_id, name, price, commission_type, commission_value, is_active, menu_id),
+                (display_id, name, price, coupon_discount, commission_type, commission_value, is_active, menu_id),
             )
             conn.commit()
             flash("メニューを更新しました。", "ok")
@@ -722,6 +735,7 @@ def create_app() -> Flask:
         display_id = int(display_id_raw) if display_id_raw else None
         name = (request.form.get("name") or "").strip()
         price = int(request.form.get("price") or "0")
+        coupon_discount = int(request.form.get("coupon_discount") or "0")
         is_active = 1 if (request.form.get("is_active") == "on") else 0
 
         commission_type = (request.form.get("commission_type") or "").strip() or None
@@ -737,6 +751,9 @@ def create_app() -> Flask:
         if price < 0:
             flash("金額が不正です。", "error")
             return redirect(url_for("menus_list"))
+        if coupon_discount < 0:
+            flash("クーポン割引額が不正です。", "error")
+            return redirect(url_for("menus_list"))
         if commission_type is not None and commission_type not in ("percent", "fixed"):
             flash("歩合タイプが不正です。", "error")
             return redirect(url_for("menus_list"))
@@ -746,10 +763,10 @@ def create_app() -> Flask:
             new_id = exec1(
                 conn,
                 """
-                INSERT INTO menus(display_id, name, price, commission_type, commission_value, is_active, created_at)
-                VALUES (?, ?, ?, ?, ?, ?, ?)
+                INSERT INTO menus(display_id, name, price, coupon_discount, commission_type, commission_value, is_active, created_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
                 """,
-                (display_id, name, price, commission_type, commission_value, is_active, now_iso()),
+                (display_id, name, price, coupon_discount, commission_type, commission_value, is_active, now_iso()),
             )
             if display_id is None:
                 conn.execute("UPDATE menus SET display_id = ? WHERE id = ?", (new_id, new_id))
@@ -1031,6 +1048,7 @@ def create_app() -> Flask:
               m.id AS menu_id,
               m.name AS menu_name,
               m.price AS menu_price,
+              m.coupon_discount AS menu_coupon_discount,
               m.commission_type AS menu_commission_type,
               m.commission_value AS menu_commission_value
             FROM treatments t
@@ -1062,10 +1080,12 @@ def create_app() -> Flask:
                 unit_price_yen=price,
                 quantity=int(r["quantity"]),
                 rule=rule,
+                coupon_discount_yen=int(r["menu_coupon_discount"] or 0),
                 hpb_discount_yen=int(r["hpb"] or 0),
                 p_points_yen=int(r["p"] or 0),
                 r_nomination_fee_yen=int(r["r"] or 0),
             )
+            coupon_discount_total = int(r["menu_coupon_discount"] or 0) * max(1, int(r["quantity"]))
             count_as_customer = (
                 int(r["count_as_customer"])
                 if r["count_as_customer"] is not None
@@ -1084,6 +1104,7 @@ def create_app() -> Flask:
                     "p": int(r["p"] or 0),
                     "r": int(r["r"] or 0),
                     "price": price,
+                    "coupon_discount": coupon_discount_total,
                     "gross_menu": gross_menu,
                     "discount_total": discount_total,
                     "net_menu": net_menu,
@@ -1203,6 +1224,7 @@ def create_app() -> Flask:
                     "P",
                     "R",
                     "単価(円)",
+                    "クーポン割引(円)",
                     "売上(円)",
                     "歩合タイプ",
                     "歩合値",
@@ -1223,6 +1245,7 @@ def create_app() -> Flask:
                         d["p"],
                         d["r"],
                         d["price"],
+                        d["coupon_discount"],
                         d["sales"],
                         d["rule_type"],
                         d["rule_value"],
@@ -1312,6 +1335,7 @@ def create_app() -> Flask:
               m.id AS menu_id,
               m.name AS menu_name,
               m.price AS menu_price,
+              m.coupon_discount AS menu_coupon_discount,
               m.commission_type AS menu_commission_type,
               m.commission_value AS menu_commission_value
             FROM treatments t
@@ -1339,10 +1363,12 @@ def create_app() -> Flask:
                 unit_price_yen=price,
                 quantity=int(r["quantity"]),
                 rule=rule,
+                coupon_discount_yen=int(r["menu_coupon_discount"] or 0),
                 hpb_discount_yen=int(r["hpb"] or 0),
                 p_points_yen=int(r["p"] or 0),
                 r_nomination_fee_yen=int(r["r"] or 0),
             )
+            coupon_discount_total = int(r["menu_coupon_discount"] or 0) * max(1, int(r["quantity"]))
             count_as_customer = (
                 int(r["count_as_customer"])
                 if r["count_as_customer"] is not None
@@ -1360,6 +1386,7 @@ def create_app() -> Flask:
                 "p": int(r["p"] or 0),
                 "r": int(r["r"] or 0),
                 "price": price,
+                "coupon_discount": coupon_discount_total,
                 "gross_menu": gross_menu,
                 "discount_total": discount_total,
                 "net_menu": net_menu,
@@ -1429,6 +1456,7 @@ def create_app() -> Flask:
                     "日付",
                     "メニュー",
                     "単価(円)",
+                    "クーポン割引(円)",
                     "HPB割引(円)",
                     "P割引(円)",
                     "指名料R(円)",
@@ -1447,6 +1475,7 @@ def create_app() -> Flask:
                     d["service_date"],
                     d["menu_name"],
                     d["price"],
+                    d["coupon_discount"],
                     d["hpb"],
                     d["p"],
                     d["r"],

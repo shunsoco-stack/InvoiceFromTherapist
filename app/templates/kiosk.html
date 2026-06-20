@@ -94,6 +94,7 @@
               {% for m in menus %}
                 <option value="{{ m.id }}"
                         data-price="{{ m.price }}"
+                        data-coupon-discount="{{ m.coupon_discount or 0 }}"
                         data-commission-type="{{ m.commission_type or '' }}"
                         data-commission-value="{{ m.commission_value if m.commission_value is not none else '' }}">
                   {{ m.name }}
@@ -109,6 +110,7 @@
               {% for m in menus %}
                 <option value="{{ m.id }}"
                         data-price="{{ m.price }}"
+                        data-coupon-discount="{{ m.coupon_discount or 0 }}"
                         data-commission-type="{{ m.commission_type or '' }}"
                         data-commission-value="{{ m.commission_value if m.commission_value is not none else '' }}">
                   {{ m.name }}
@@ -176,6 +178,7 @@
             {% for s in summaries %}
               {% set items = items_by_therapist.get(s.therapist_id, []) %}
               {% set shop_share = (s.sales_total|int) - (s.payout_total|int) %}
+              {% set coupon_total = coupon_totals.get(s.therapist_id, 0) %}
               {% set hpb_total = hpb_totals.get(s.therapist_id, 0) %}
               {% set p_total = p_totals.get(s.therapist_id, 0) %}
               {% set r_total = r_totals.get(s.therapist_id, 0) %}
@@ -233,6 +236,10 @@
                     <tr>
                       <td class="kioskSheetTd">HPB（割引）/ ส่วนลด</td>
                       <td class="kioskSheetTd kioskSheetTd--right mono">{{ "{:,}".format(hpb_total) }}</td>
+                    </tr>
+                    <tr>
+                      <td class="kioskSheetTd">クーポン割引</td>
+                      <td class="kioskSheetTd kioskSheetTd--right mono">{{ "{:,}".format(coupon_total) }}</td>
                     </tr>
                     <tr>
                       <td class="kioskSheetTd">P（ポイント）/ แต้ม</td>
@@ -345,9 +352,9 @@
           return { type: 'percent', value: 50 };
         }
 
-        function calcTreatment(price, rule, hpb, p, r) {
+        function calcTreatment(price, couponDiscount, rule, hpb, p, r) {
           const gross = Math.max(0, Math.trunc(price));
-          const discount = Math.max(0, Math.trunc(hpb)) + Math.max(0, Math.trunc(p));
+          const discount = Math.max(0, Math.trunc(couponDiscount)) + Math.max(0, Math.trunc(hpb)) + Math.max(0, Math.trunc(p));
           const net = Math.max(0, gross - discount);
           let staffMenu = 0;
           if (rule.type === 'fixed') {
@@ -383,6 +390,7 @@
           }
           return {
             price: readNumber(opt.dataset.price),
+            couponDiscount: readNumber(opt.dataset.couponDiscount),
             commissionType: opt.dataset.commissionType || '',
             commissionValue: opt.dataset.commissionValue === '' ? null : readNumber(opt.dataset.commissionValue),
           };
@@ -415,13 +423,13 @@
           const p = readNumber(pInput?.value);
           const r = readNumber(rSelect?.value);
           const rule1 = pickRule(menu1.commissionType, menu1.commissionValue, therapistRule.type, therapistRule.value);
-          const result1 = calcTreatment(menu1.price, rule1, hpb, p, r);
+          const result1 = calcTreatment(menu1.price, menu1.couponDiscount, rule1, hpb, p, r);
 
           let result2 = null;
           const menu2 = getMenuData(menuSelect2);
           if (menu2) {
             const rule2 = pickRule(menu2.commissionType, menu2.commissionValue, therapistRule.type, therapistRule.value);
-            result2 = calcTreatment(menu2.price, rule2, 0, 0, 0);
+            result2 = calcTreatment(menu2.price, menu2.couponDiscount, rule2, 0, 0, 0);
           }
 
           estimateMenu1.textContent = formatYen(result1.sales);
@@ -555,4 +563,3 @@
     {% endif %}
   </div>
 {% endblock %}
-

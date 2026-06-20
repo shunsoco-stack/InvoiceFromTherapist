@@ -73,6 +73,7 @@
             <th>メニュー</th>
             <th class="right">客数</th>
             <th class="right">単価</th>
+            <th class="right">クーポン</th>
             <th class="right">HPB</th>
             <th class="right">P</th>
             <th class="right">指名料R</th>
@@ -90,6 +91,7 @@
               <td>{{ d.menu_name }}</td>
               <td class="right mono">{% if d.count_as_customer %}{{ d.quantity }}{% else %}—{% endif %}</td>
               <td class="right mono">{{ "{:,}".format(d.price) }}円</td>
+              <td class="right mono">{% if d.coupon_discount %}{{ d.coupon_discount }}{% endif %}</td>
               <td class="right mono">{% if d.hpb %}{{ d.hpb }}{% endif %}</td>
               <td class="right mono">{% if d.p %}{{ d.p }}{% endif %}</td>
               <td class="right mono">{% if d.r %}{{ "{:,}".format(d.r) }}円{% endif %}</td>
@@ -102,7 +104,7 @@
             </tr>
           {% endfor %}
           {% if details|length == 0 %}
-            <tr><td colspan="12" class="muted">該当する施術記録がありません。</td></tr>
+            <tr><td colspan="13" class="muted">該当する施術記録がありません。</td></tr>
           {% endif %}
         </tbody>
       </table>
