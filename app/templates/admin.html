@@ -10,6 +10,7 @@
     <h2>今日（{{ today }}）</h2>
     <div class="actions">
       <a class="btn" href="{{ url_for('report_daily', date=today) }}">日次レポート / รายงาน</a>
+      <a class="btn btn--secondary" href="{{ url_for('report_monthly', month=today[:7]) }}">月次カレンダー</a>
       <a class="btn btn--secondary" href="{{ url_for('treatments_list', date=today) }}">施術入力（詳細）/ รายการ</a>
     </div>
   </section>

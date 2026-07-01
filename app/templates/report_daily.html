@@ -14,6 +14,7 @@
       <button class="btn btn--secondary" type="button" data-date-shift="1">翌日</button>
       <button class="btn btn--secondary" type="submit">表示</button>
       <a class="btn btn--secondary" href="{{ url_for('treatments_list', date=service_date) }}">この日の施術入力</a>
+      <a class="btn btn--secondary" href="{{ url_for('report_monthly', month=service_date[:7]) }}">月次カレンダー</a>
       <a class="btn" href="{{ url_for('report_daily_csv', date=service_date) }}">CSV出力</a>
     </form>
   </section>

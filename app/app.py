@@ -1394,6 +1394,88 @@ def create_app() -> Flask:
             })
         return detail_lines
 
+    def _parse_month(month_value: Optional[str]) -> date:
+        today = date.today()
+        raw = (month_value or today.strftime("%Y-%m")).strip()
+        try:
+            return datetime.strptime(raw[:7] + "-01", "%Y-%m-%d").date()
+        except ValueError:
+            return today.replace(day=1)
+
+    def _shift_month(month_start: date, offset: int) -> date:
+        month_index = month_start.year * 12 + (month_start.month - 1) + offset
+        return date(month_index // 12, (month_index % 12) + 1, 1)
+
+    def _monthly_calendar(details: List[Dict[str, object]], month_start: date) -> Tuple[List[List[Dict[str, object]]], Dict[str, int]]:
+        next_month = _shift_month(month_start, 1)
+        month_end = next_month - timedelta(days=1)
+        daily: Dict[str, Dict[str, int]] = {}
+
+        for d in details:
+            day = str(d["service_date"])
+            bucket = daily.setdefault(day, {"sales": 0, "customers": 0})
+            bucket["sales"] += int(d["sales"])
+            if int(d.get("count_as_customer") or 0):
+                bucket["customers"] += int(d["quantity"])
+
+        cells: List[Dict[str, object]] = []
+        for _ in range(month_start.weekday()):
+            cells.append({"date": None})
+
+        current = month_start
+        today_iso = date.today().isoformat()
+        while current <= month_end:
+            key = current.isoformat()
+            totals = daily.get(key, {"sales": 0, "customers": 0})
+            cells.append(
+                {
+                    "date": key,
+                    "day": current.day,
+                    "weekday": current.weekday(),
+                    "sales": totals["sales"],
+                    "customers": totals["customers"],
+                    "has_record": bool(totals["sales"] or totals["customers"]),
+                    "is_today": key == today_iso,
+                }
+            )
+            current += timedelta(days=1)
+
+        while len(cells) % 7:
+            cells.append({"date": None})
+
+        weeks = [cells[i : i + 7] for i in range(0, len(cells), 7)]
+        totals = {
+            "sales": sum(int(v["sales"]) for v in daily.values()),
+            "customers": sum(int(v["customers"]) for v in daily.values()),
+            "active_days": sum(1 for v in daily.values() if int(v["sales"]) or int(v["customers"])),
+        }
+        return weeks, totals
+
+    @app.get("/reports/monthly")
+    def report_monthly():
+        month_start = _parse_month(request.args.get("month"))
+        next_month = _shift_month(month_start, 1)
+        month_end = next_month - timedelta(days=1)
+        date_from = month_start.isoformat()
+        date_to = month_end.isoformat()
+        conn = connect()
+        try:
+            rows = _staff_report_rows(conn, date_from, date_to, None)
+            details = _compute_staff_details(rows)
+            weeks, totals = _monthly_calendar(details, month_start)
+            return render_template(
+                "report_monthly.html",
+                month=month_start.strftime("%Y-%m"),
+                month_label=f"{month_start.year}年{month_start.month}月",
+                prev_month=_shift_month(month_start, -1).strftime("%Y-%m"),
+                next_month=next_month.strftime("%Y-%m"),
+                weekday_labels=["月", "火", "水", "木", "金", "土", "日"],
+                weeks=weeks,
+                totals=totals,
+            )
+        finally:
+            conn.close()
+
     @app.get("/reports/staff")
     def report_staff():
         today = date.today().isoformat()

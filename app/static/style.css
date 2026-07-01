@@ -165,6 +165,112 @@ input::placeholder{ color: rgba(169,180,202,.7); }
 }
 .right{ text-align:right; }
 
+.monthlySummary{
+  display:grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+  border-top: 1px solid rgba(241,198,220,.75);
+  border-bottom: 1px solid rgba(241,198,220,.75);
+}
+.monthlySummary__item{
+  padding: 12px;
+}
+.monthlySummary__label{
+  display:block;
+  color: var(--muted);
+  font-size: 12px;
+  margin-bottom: 4px;
+}
+.monthlySummary__value{
+  display:block;
+  font-weight: 800;
+  font-size: 20px;
+  overflow-wrap: anywhere;
+}
+.monthlyCalendarWrap{
+  overflow:auto;
+  border-radius: 14px;
+  border: 1px solid rgba(241,198,220,.95);
+  background: rgba(255,255,255,.82);
+  box-shadow: var(--shadow2);
+}
+.monthlyCalendar{
+  min-width: 760px;
+  display:grid;
+  grid-template-columns: repeat(7, minmax(100px, 1fr));
+}
+.monthlyCalendar__weekday{
+  padding: 9px 10px;
+  border-right: 1px solid rgba(241,198,220,.75);
+  border-bottom: 1px solid rgba(241,198,220,.95);
+  background: rgba(255,240,247,.95);
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 700;
+  text-align:center;
+}
+.monthlyCalendar__weekday:nth-child(7n){
+  border-right: 0;
+}
+.monthlyCalendar__weekday--weekend{
+  color: var(--accent);
+}
+.monthlyCalendar__day{
+  min-height: 112px;
+  padding: 9px 10px;
+  border-right: 1px solid rgba(241,198,220,.55);
+  border-bottom: 1px solid rgba(241,198,220,.55);
+  color: var(--text);
+  display:flex;
+  flex-direction: column;
+  gap: 7px;
+  background: rgba(255,255,255,.7);
+}
+.monthlyCalendar__day:hover{
+  background: rgba(255,240,247,.98);
+  text-decoration:none;
+}
+.monthlyCalendar__day:nth-child(7n){
+  border-right: 0;
+}
+.monthlyCalendar__day--weekend{
+  background: rgba(255,247,251,.88);
+}
+.monthlyCalendar__day--today{
+  box-shadow: inset 0 0 0 2px rgba(32,201,151,.38);
+}
+.monthlyCalendar__day--blank{
+  background: rgba(255,255,255,.42);
+}
+.monthlyCalendar__day--blank:hover{
+  background: rgba(255,255,255,.42);
+}
+.monthlyCalendar__date{
+  width: 28px;
+  height: 28px;
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  border-radius: 999px;
+  background: rgba(255,111,177,.12);
+  font-weight: 800;
+}
+.monthlyCalendar__metric{
+  display:block;
+  font-size: 13px;
+  line-height: 1.35;
+  overflow-wrap: anywhere;
+}
+.monthlyCalendar__empty{
+  color: var(--muted);
+  font-size: 12px;
+}
+@media (max-width: 720px){
+  .monthlySummary{
+    grid-template-columns: 1fr;
+  }
+}
+
 .pill{
   display:inline-flex;
   align-items:center;
