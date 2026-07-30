@@ -9,10 +9,12 @@
     {% endif %}
     <div class="homeSimple__title mono">{{ today }}</div>
     <div class="homeSimple__buttons">
-      <a class="btn homeSimple__btn homeSimple__btn--primary" href="{{ url_for('kiosk') }}">入力 / บันทึก</a>
-      <a class="btn btn--secondary homeSimple__btn homeSimple__btn--admin" href="{{ url_for('admin') }}">管理 / จัดการ</a>
-      <a class="btn btn--secondary homeSimple__btn homeSimple__btn--supplies" href="{{ url_for('supplies_page') }}">
-        <span class="homeSimple__btnLabel">備品 / ของใช้</span>
+      <a class="btn homeSimple__btn homeSimple__btn--primary" href="{{ url_for('kiosk') }}">บันทึกงาน / 入力</a>
+      <a class="btn btn--secondary homeSimple__btn homeSimple__btn--admin" href="{{ url_for('admin') }}">จัดการร้าน / 管理</a>
+      <a class="btn btn--secondary homeSimple__btn homeSimple__btn--supplies"
+         href="{{ url_for('supplies_page') }}"
+         aria-label="ของใช้ในร้าน / 備品{% if supply_alerts_count and supply_alerts_count > 0 %}（มีการแจ้งเตือน {{ supply_alerts_count }} รายการ）{% endif %}">
+        <span class="homeSimple__btnLabel">ของใช้ในร้าน / 備品</span>
         {% if supply_alerts_count and supply_alerts_count > 0 %}
           <span class="homeSimple__btnBadge" aria-hidden="true">!</span>
         {% endif %}

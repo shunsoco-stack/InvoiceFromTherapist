@@ -1,14 +1,14 @@
 {% extends "base.html" %}
-{% set title = "簡単入力 / Simple" %}
+{% set title = "บันทึกงาน / 簡単入力" %}
 {% block content %}
   <div class="kiosk">
     <div class="kiosk__head">
-      <h1 class="kiosk__title">簡単入力 / Simple</h1>
-      <div class="kiosk__subtitle muted">Therapist input / สำหรับพนักงาน</div>
+      <h1 class="kiosk__title">บันทึกงาน / 簡単入力</h1>
+      <div class="kiosk__subtitle muted" lang="th">หน้าบันทึกสำหรับพนักงาน</div>
     </div>
 
     <section class="card kiosk__card">
-      <h2>日付 / Date / วันที่（固定）</h2>
+      <h2>วันที่บันทึก / 入力日（固定）</h2>
       <div class="kiosk__fixedDate mono">{{ service_date }}</div>
     </section>
 
@@ -23,12 +23,13 @@
       </section>
     {% else %}
       <section class="card kiosk__card">
-        <h2>日付 / วันที่</h2>
+        <h2>เปลี่ยนวันที่ / 日付変更</h2>
         <form class="inline" method="get" action="{{ url_for('kiosk') }}">
-          <button class="btn btn--secondary kiosk__btn" type="button" data-date-shift="-1">前日 / วันก่อน</button>
-          <input class="kiosk__dateInput" name="date" type="date" value="{{ service_date }}" data-auto-submit />
-          <button class="btn btn--secondary kiosk__btn" type="button" data-date-shift="1">翌日 / วันถัดไป</button>
-          <button class="btn btn--secondary kiosk__btn" type="submit">表示 / แสดง</button>
+          <button class="btn btn--secondary kiosk__btn" type="button" data-date-shift="-1">วันก่อน / 前日</button>
+          <label class="sr-only" for="kiosk-date">วันที่ / 日付</label>
+          <input id="kiosk-date" class="kiosk__dateInput" name="date" type="date" value="{{ service_date }}" data-auto-submit />
+          <button class="btn btn--secondary kiosk__btn" type="button" data-date-shift="1">วันถัดไป / 翌日</button>
+          <button class="btn btn--secondary kiosk__btn" type="submit">ดูวันที่นี้ / 表示</button>
           {% if selected_therapist_id %}
             <input type="hidden" name="therapist_id" value="{{ selected_therapist_id }}" />
           {% endif %}
@@ -36,11 +37,11 @@
       </section>
 
       <section id="input" class="card kiosk__card">
-        <h2>入力 / กรอก</h2>
+        <h2>กรอกข้อมูล / 入力</h2>
         <form class="kioskForm" method="post" action="{{ url_for('kiosk_new') }}">
           <input type="hidden" name="service_date" value="{{ service_date }}" />
           <div class="kioskRow">
-            <div class="kioskLabel">1) セラピスト / พนักงาน</div>
+            <label class="kioskLabel" for="therapistSelect">1) พนักงาน / セラピスト</label>
             <select id="therapistSelect" class="kioskSelect" name="therapist_id" required>
               <option value="" selected disabled>เลือกพนักงาน</option>
               {% for t in therapists %}
@@ -56,7 +57,7 @@
           </div>
 
           <div id="guaranteeRow" class="kioskRow kioskRow--hidden" data-guarantee-lock="{{ '1' if guarantee_lock else '0' }}">
-            <div class="kioskLabel">0人の場合の最低保証 / ขั้นต่ำเมื่อไม่มีลูกค้า</div>
+            <label class="kioskLabel" for="guaranteeAmount">ค่าจ้างขั้นต่ำเมื่อลูกค้า 0 คน / 最低保証</label>
             <div class="kioskGuarantee">
               <input type="hidden" name="service_date" value="{{ service_date }}" form="kioskGuaranteeForm" />
               <input type="hidden" name="therapist_id" id="guaranteeTherapistId" value="{{ selected_therapist_id }}" form="kioskGuaranteeForm" />
@@ -69,10 +70,10 @@
                      placeholder="5000"
                      value="{% if selected_payout and selected_payout.method == '最低保証' %}{{ selected_payout.paid_amount }}{% endif %}"
                      form="kioskGuaranteeForm" />
-              <button class="btn btn--secondary kioskSmallBtn" type="submit" form="kioskGuaranteeForm">最低保証を記録 / บันทึกขั้นต่ำ</button>
+              <button class="btn btn--secondary kioskSmallBtn" type="submit" form="kioskGuaranteeForm">บันทึกค่าจ้างขั้นต่ำ / 最低保証を記録</button>
             </div>
             <div id="guaranteeStatus" class="kioskGuarantee__status" {% if not selected_payout or selected_payout.method != "最低保証" %}hidden{% endif %}>
-              <span class="pill pill--ok">最低保証登録済</span>
+              <span class="pill pill--ok">บันทึกแล้ว / 登録済</span>
               <span class="mono" id="guaranteeStatusAmount">
                 {% if selected_payout and selected_payout.method == "最低保証" %}
                   {{ "{:,}".format(selected_payout.paid_amount) }}円
@@ -80,15 +81,15 @@
               </span>
               <input type="hidden" name="service_date" value="{{ service_date }}" form="kioskGuaranteeDeleteForm" />
               <input type="hidden" name="therapist_id" id="guaranteeDeleteTherapistId" value="{{ selected_therapist_id }}" form="kioskGuaranteeDeleteForm" />
-              <button class="btn btn--danger kioskSmallBtn" type="submit" form="kioskGuaranteeDeleteForm">削除 / ลบ</button>
+              <button class="btn btn--danger kioskSmallBtn" type="submit" form="kioskGuaranteeDeleteForm">ลบ / 削除</button>
             </div>
             <div id="guaranteeNote" class="kioskGuarantee__note muted small" hidden>
-              最低保証がある場合はメニュー選択できません。
+              หากบันทึกค่าจ้างขั้นต่ำแล้ว จะเลือกเมนูไม่ได้ / 最低保証がある場合はメニュー選択できません。
             </div>
           </div>
 
           <div id="menuRow" class="kioskRow kioskRow--hidden">
-            <div class="kioskLabel">2) メニュー① / เมนู 1（T/60）</div>
+            <label class="kioskLabel" for="menuSelect1">2) เมนูหลัก / メニュー①（T/60）</label>
             <select id="menuSelect1" class="kioskSelect" name="menu_id_1" required disabled>
               <option value="" selected disabled>เลือกเมนู</option>
               {% for m in menus %}
@@ -104,9 +105,9 @@
           </div>
 
           <div id="menuRow2" class="kioskRow kioskRow--hidden">
-            <div class="kioskLabel">3) メニュー②（任意） / เมนู 2 (ไม่บังคับ)</div>
+            <label class="kioskLabel" for="menuSelect2">3) เมนูเสริม（ไม่บังคับ）/ メニュー②（任意）</label>
             <select id="menuSelect2" class="kioskSelect" name="menu_id_2" disabled>
-              <option value="0" selected data-price="0" data-commission-type="" data-commission-value="">なし / ไม่มี</option>
+              <option value="0" selected data-price="0" data-commission-type="" data-commission-value="">ไม่มี / なし</option>
               {% for m in menus %}
                 <option value="{{ m.id }}"
                         data-price="{{ m.price }}"
@@ -120,24 +121,24 @@
           </div>
 
           <div id="actionsRow" class="actions kiosk__actions kioskRow--hidden">
-            <div class="kioskEstimate" id="kioskEstimate">
+            <div class="kioskEstimate" id="kioskEstimate" aria-live="polite">
               <div class="kioskEstimate__row">
                 <div class="kioskEstimate__cell">
-                  <span class="kioskEstimate__label">メニュー① / เมนู 1</span>
+                  <span class="kioskEstimate__label">เมนูหลัก / メニュー①</span>
                   <span class="kioskEstimate__value" id="estimateMenu1">-</span>
                 </div>
                 <div class="kioskEstimate__cell">
-                  <span class="kioskEstimate__label">スタッフ / พนักงาน</span>
+                  <span class="kioskEstimate__label">ค่าจ้างพนักงาน / スタッフ</span>
                   <span class="kioskEstimate__value" id="estimateStaff1">-</span>
                 </div>
               </div>
               <div class="kioskEstimate__row" id="estimateRow2" hidden>
                 <div class="kioskEstimate__cell">
-                  <span class="kioskEstimate__label">メニュー② / เมนู 2</span>
+                  <span class="kioskEstimate__label">เมนูเสริม / メニュー②</span>
                   <span class="kioskEstimate__value" id="estimateMenu2">-</span>
                 </div>
                 <div class="kioskEstimate__cell">
-                  <span class="kioskEstimate__label">スタッフ / พนักงาน</span>
+                  <span class="kioskEstimate__label">ค่าจ้างพนักงาน / スタッフ</span>
                   <span class="kioskEstimate__value" id="estimateStaff2">-</span>
                 </div>
               </div>
@@ -145,24 +146,24 @@
             </div>
             <div class="kioskInlineFields">
               <div class="kioskInlineField">
-                <label class="kioskLabel" for="hpb">HPB（割引）/ ส่วนลด</label>
+                <label class="kioskLabel" for="hpb">ส่วนลด HPB / HPB（割引）</label>
                 <input id="hpb" name="hpb" class="kioskInput" type="number" inputmode="numeric" min="0" placeholder="0" />
               </div>
               <div class="kioskInlineField">
-                <label class="kioskLabel" for="p">P（ポイント）/ แต้ม</label>
+                <label class="kioskLabel" for="p">แต้มสะสม P / P（ポイント）</label>
                 <input id="p" name="p" class="kioskInput" type="number" inputmode="numeric" min="0" placeholder="0" />
               </div>
               <div class="kioskInlineField">
-                <label class="kioskLabel" for="r">R（指名料）/ ค่าตัว</label>
+                <label class="kioskLabel" for="r">ค่าเลือกพนักงาน R / R（指名料）</label>
                 <select id="r" name="r" class="kioskSelect kioskSelect--small" required>
-                  <option value="0" selected>なし / ไม่มี</option>
+                  <option value="0" selected>ไม่มี / なし</option>
                   <option value="500">500</option>
                   <option value="1000">1000</option>
                 </select>
               </div>
             </div>
-            <button class="btn kiosk__btn kiosk__btn--primary" type="submit">保存 / บันทึก</button>
-            <button class="btn btn--secondary kiosk__btn" type="submit" name="continue_add" value="1">保存して続ける / บันทึกต่อ</button>
+            <button class="btn kiosk__btn kiosk__btn--primary" type="submit">บันทึก / 保存</button>
+            <button class="btn btn--secondary kiosk__btn" type="submit" name="continue_add" value="1">บันทึกแล้วเพิ่มรายการต่อ / 保存して続ける</button>
           </div>
         </form>
         <form id="kioskGuaranteeForm" method="post" action="{{ url_for('kiosk_guarantee') }}"></form>
@@ -170,9 +171,9 @@
       </section>
 
       <section id="summary" class="card kiosk__card">
-        <h2>集計 / สรุป（{{ service_date }}）</h2>
+        <h2>สรุป / 集計（{{ service_date }}）</h2>
         {% if summaries|length == 0 %}
-          <div class="muted">まだ記録がありません。</div>
+          <div class="muted">ยังไม่มีรายการ / まだ記録がありません。</div>
         {% else %}
           <div class="kioskSheets">
             {% for s in summaries %}
@@ -186,11 +187,11 @@
                 <table class="kioskSheetTable">
                   <thead>
                     <tr>
-                      <th class="kioskSheetTh" colspan="2">スタッフ名 / พนักงาน　{{ s.therapist_name }}</th>
+                      <th class="kioskSheetTh" colspan="2">พนักงาน / スタッフ名　{{ s.therapist_name }}</th>
                     </tr>
                     <tr>
-                      <th class="kioskSheetTh">メニュー / เมนู</th>
-                      <th class="kioskSheetTh kioskSheetTh--right">金額 / ราคา</th>
+                      <th class="kioskSheetTh">เมนู / メニュー</th>
+                      <th class="kioskSheetTh kioskSheetTh--right">ราคา / 金額</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -208,9 +209,9 @@
                       <tr>
                         <td class="kioskSheetTd muted" colspan="2">
                           {% if s.paid_method == "最低保証" %}
-                            最低保証
+                            ค่าจ้างขั้นต่ำ / 最低保証
                           {% else %}
-                            （まだなし）
+                            （ยังไม่มี / まだなし）
                           {% endif %}
                         </td>
                       </tr>
@@ -218,35 +219,35 @@
                   </tbody>
                   <tfoot>
                     <tr>
-                      <td class="kioskSheetTd">客数 / ลูกค้า</td>
+                      <td class="kioskSheetTd">จำนวนลูกค้า / 客数</td>
                       <td class="kioskSheetTd kioskSheetTd--right mono strong">{{ s.customer_count }}</td>
                     </tr>
                     <tr>
-                      <td class="kioskSheetTd">合計 / รวม</td>
+                      <td class="kioskSheetTd">ยอดขายรวม / 合計</td>
                       <td class="kioskSheetTd kioskSheetTd--right mono">{{ "{:,}".format(s.sales_total) }}</td>
                     </tr>
                     <tr>
-                      <td class="kioskSheetTd">スタッフ / พนักงาน</td>
+                      <td class="kioskSheetTd">ค่าจ้างพนักงาน / スタッフ</td>
                       <td class="kioskSheetTd kioskSheetTd--right mono strong">{{ "{:,}".format(s.payout_total) }}</td>
                     </tr>
                     <tr>
-                      <td class="kioskSheetTd">店舗 / ร้าน</td>
+                      <td class="kioskSheetTd">ส่วนของร้าน / 店舗</td>
                       <td class="kioskSheetTd kioskSheetTd--right mono">{{ "{:,}".format(shop_share) }}</td>
                     </tr>
                     <tr>
-                      <td class="kioskSheetTd">HPB（割引）/ ส่วนลด</td>
+                      <td class="kioskSheetTd">ส่วนลด HPB / HPB（割引）</td>
                       <td class="kioskSheetTd kioskSheetTd--right mono">{{ "{:,}".format(hpb_total) }}</td>
                     </tr>
                     <tr>
-                      <td class="kioskSheetTd">クーポン割引</td>
+                      <td class="kioskSheetTd">ส่วนลดคูปอง / クーポン割引</td>
                       <td class="kioskSheetTd kioskSheetTd--right mono">{{ "{:,}".format(coupon_total) }}</td>
                     </tr>
                     <tr>
-                      <td class="kioskSheetTd">P（ポイント）/ แต้ม</td>
+                      <td class="kioskSheetTd">แต้มสะสม P / P（ポイント）</td>
                       <td class="kioskSheetTd kioskSheetTd--right mono">{{ "{:,}".format(p_total) }}</td>
                     </tr>
                     <tr>
-                      <td class="kioskSheetTd">R（指名料）/ ค่าตัว</td>
+                      <td class="kioskSheetTd">ค่าเลือกพนักงาน R / R（指名料）</td>
                       <td class="kioskSheetTd kioskSheetTd--right mono">{{ "{:,}".format(r_total) }}</td>
                     </tr>
                   </tfoot>
@@ -258,19 +259,19 @@
       </section>
 
       <section id="history" class="card kiosk__card">
-        <h2>履歴（修正/削除）/ ประวัติ（แก้ไข/ลบ）</h2>
-        <p class="muted">入力ミスを直したい時はここからできます。 / แก้ไขได้ที่นี่</p>
-        <div class="table-wrap">
+        <h2>ประวัติ（แก้ไข/ลบ）/ 履歴（修正/削除）</h2>
+        <p class="muted">หากกรอกผิด แก้ไขได้ที่นี่ / 入力ミスを直したい時はここからできます。</p>
+        <div class="table-wrap" tabindex="0" role="region" aria-label="ประวัติรายการ / 入力履歴">
           <table class="table">
             <thead>
               <tr>
-                <th>ID</th>
-                <th>セラピスト / พนักงาน</th>
-                <th>メニュー / เมนู</th>
-                <th class="right">HPB</th>
-                <th class="right">P</th>
-                <th class="right">R</th>
-                <th></th>
+                <th scope="col">ID</th>
+                <th scope="col">พนักงาน / セラピスト</th>
+                <th scope="col">เมนู / メニュー</th>
+                <th scope="col" class="right">HPB</th>
+                <th scope="col" class="right">P</th>
+                <th scope="col" class="right">R</th>
+                <th scope="col"><span class="sr-only">操作</span></th>
               </tr>
             </thead>
             <tbody>
@@ -284,17 +285,17 @@
                   <td class="right mono">{{ r.r }}</td>
                   <td class="right">
                     <div class="actions" style="justify-content:flex-end; margin:0;">
-                      <a class="btn btn--secondary kioskSmallBtn" href="{{ url_for('kiosk_edit', treatment_id=r.id, date=service_date) }}">修正 / แก้ไข</a>
-                      <form method="post" action="{{ url_for('kiosk_delete', treatment_id=r.id) }}" onsubmit="return confirm('削除しますか？');">
+                      <a class="btn btn--secondary kioskSmallBtn" href="{{ url_for('kiosk_edit', treatment_id=r.id, date=service_date) }}">แก้ไข / 修正</a>
+                      <form method="post" action="{{ url_for('kiosk_delete', treatment_id=r.id) }}" onsubmit="return confirm('ต้องการลบรายการนี้หรือไม่？ / 削除しますか？');">
                         <input type="hidden" name="return_date" value="{{ service_date }}" />
-                        <button class="btn btn--danger kioskSmallBtn" type="submit">削除 / ลบ</button>
+                        <button class="btn btn--danger kioskSmallBtn" type="submit">ลบ / 削除</button>
                       </form>
                     </div>
                   </td>
                 </tr>
               {% endfor %}
               {% if recent|length == 0 %}
-                <tr><td colspan="7" class="muted">まだ入力がありません。 / ยังไม่มีรายการ</td></tr>
+                <tr><td colspan="7" class="muted">ยังไม่มีรายการ / まだ入力がありません。</td></tr>
               {% endif %}
             </tbody>
           </table>
@@ -302,11 +303,11 @@
       </section>
 
       <section class="card kiosk__card">
-        <h2>ヘルプ / ช่วยเหลือ</h2>
+        <h2>วิธีใช้ / ヘルプ</h2>
         <ul class="list">
-          <li>押す順番 / ลำดับ: <b>セラピスト → メニュー① → （メニュー②） → 保存</b></li>
-          <li><b>メニュー②</b>は売上・歩合には含まれますが、<b>客数</b>の集計には含みません（同一組のオプション扱い）。</li>
-          <li>間違えたら「今日の履歴」から修正/削除できます。</li>
+          <li lang="th"><b>ลำดับการกด:</b> พนักงาน → เมนูหลัก →（เมนูเสริม）→ บันทึก</li>
+          <li lang="th">เมนูเสริมรวมในยอดขายและค่าจ้าง แต่ไม่นับลูกค้าเพิ่ม</li>
+          <li lang="th">ถ้ากรอกผิด ให้แก้ไขหรือลบในประวัติของวันที่เลือก</li>
         </ul>
       </section>
 

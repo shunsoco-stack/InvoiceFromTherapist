@@ -1004,3 +1004,190 @@ input::placeholder{ color: rgba(169,180,202,.7); }
   margin-top: 8px;
 }
 .lp-eyebrow--light{ color: rgba(246,226,196,.85); }
+
+/*
+ * Elder-friendly app controls.
+ * Keep the familiar layout and pastel theme; only improve readability,
+ * target size, and the distinction between enabled and disabled fields.
+ */
+body:not(.body--landing){
+  --muted:#625d6d;
+  --control-border:#b86d94;
+  --focus:#7567e8;
+  font-size:18px;
+  line-height:1.6;
+}
+
+body:not(.body--landing) button,
+body:not(.body--landing) input,
+body:not(.body--landing) select,
+body:not(.body--landing) textarea{
+  font:inherit;
+}
+
+body:not(.body--landing) h1{
+  font-size:28px;
+  line-height:1.25;
+}
+
+body:not(.body--landing) h2{
+  font-size:20px;
+  line-height:1.35;
+}
+
+body:not(.body--landing) label{
+  color:var(--text);
+  font-size:16px;
+  font-weight:600;
+}
+
+body:not(.body--landing) .small,
+body:not(.body--landing) .help{
+  font-size:15px;
+}
+
+body:not(.body--landing) input:not([type="checkbox"]):not([type="radio"]):not([type="hidden"]),
+body:not(.body--landing) select,
+body:not(.body--landing) textarea{
+  min-height:50px;
+  border:2px solid var(--control-border);
+  background:#ffffff;
+  font-size:18px;
+}
+
+body:not(.body--landing) input::placeholder,
+body:not(.body--landing) textarea::placeholder{
+  color:#716a78;
+  opacity:1;
+}
+
+body:not(.body--landing) input:disabled,
+body:not(.body--landing) select:disabled,
+body:not(.body--landing) textarea:disabled{
+  border-color:#c4a9b6;
+  background:#f2edf0;
+  color:#665f6d;
+  cursor:not-allowed;
+  opacity:1;
+}
+
+body:not(.body--landing) .checkbox{
+  min-height:48px;
+  font-size:17px;
+}
+
+body:not(.body--landing) .checkbox input{
+  width:24px;
+  height:24px;
+  padding:0;
+}
+
+body:not(.body--landing) .btn:not(.homeSimple__btn){
+  min-height:48px;
+  padding:12px 16px;
+  border-color:var(--control-border);
+  font-size:18px;
+}
+
+body:not(.body--landing) .brand a{
+  display:inline-flex;
+  min-height:44px;
+  align-items:center;
+}
+
+body:not(.body--landing) :where(a, button, input, select, textarea):focus-visible{
+  outline:3px solid var(--focus);
+  outline-offset:3px;
+}
+
+body:not(.body--landing) .homeSimple__btn--admin,
+body:not(.body--landing) .homeSimple__btn--supplies{
+  min-height:60px;
+  font-size:20px;
+}
+
+body:not(.body--landing) .kioskLabel{
+  color:var(--text);
+  font-size:17px;
+  font-weight:700;
+}
+
+body:not(.body--landing) .kiosk__subtitle{
+  font-size:16px;
+}
+
+body:not(.body--landing) .kioskSelect{
+  min-height:60px;
+  border:2px solid var(--control-border);
+  background:#ffffff;
+  font-size:21px;
+}
+
+body:not(.body--landing) .kioskInput{
+  min-height:56px;
+  font-size:20px;
+}
+
+body:not(.body--landing) .kiosk__fixedDate{
+  border:2px solid var(--control-border);
+  background:#ffffff;
+}
+
+body:not(.body--landing) .kioskInlineField{
+  flex-wrap:wrap;
+}
+
+body:not(.body--landing) .kioskEstimate__label{
+  font-size:15px;
+}
+
+body:not(.body--landing) .kioskEstimate__value{
+  font-size:18px;
+}
+
+body:not(.body--landing) .kioskSmallBtn{
+  min-height:44px;
+  font-size:16px;
+}
+
+body:not(.body--landing) .kiosk__btn--primary{
+  border-color:#167a52;
+  background:#e9f8f1;
+  color:#0a5638;
+}
+
+body:not(.body--landing) .btn--danger{
+  border-color:#b42342;
+  background:#fff0f3;
+  color:#8f1732;
+}
+
+body:not(.body--landing) .table thead th{
+  font-size:14px;
+}
+
+body:not(.body--landing) .table tbody td{
+  font-size:16px;
+}
+
+body:not(.body--landing) .monthlyCalendar__weekday--weekend{
+  color:#a82d69;
+}
+
+body:not(.body--landing) .pill--ok{
+  border-color:#167a52;
+  background:#e9f8f1;
+  color:#126241;
+}
+
+.sr-only{
+  position:absolute;
+  width:1px;
+  height:1px;
+  padding:0;
+  margin:-1px;
+  overflow:hidden;
+  clip:rect(0, 0, 0, 0);
+  white-space:nowrap;
+  border:0;
+}
