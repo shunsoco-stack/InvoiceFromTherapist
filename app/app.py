@@ -12,6 +12,9 @@ from app.csv_import import extract_existing_sales_dates
 from app.db import connect, exec1, init_db, now_iso, q, q1
 
 
+DAILY_MINIMUM_PAYOUT_YEN = 5000
+
+
 def create_app() -> Flask:
     app = Flask(
         __name__,
@@ -22,6 +25,25 @@ def create_app() -> Flask:
     app.secret_key = os.getenv("SALON_SECRET_KEY", "dev-secret-key")  # ローカル運用想定
 
     init_db()
+
+    def _delete_topup_if_no_treatments(conn, service_date: str, therapist_id: int) -> None:
+        row = q1(
+            conn,
+            "SELECT COUNT(*) AS cnt FROM treatments WHERE service_date = ? AND therapist_id = ?",
+            (service_date, therapist_id),
+        )
+        if row and int(row["cnt"]) == 0:
+            conn.execute(
+                "DELETE FROM payout_topups WHERE service_date = ? AND therapist_id = ?",
+                (service_date, therapist_id),
+            )
+
+    def _payout_exists(conn, service_date: str, therapist_id: int) -> bool:
+        return q1(
+            conn,
+            "SELECT id FROM payouts WHERE service_date = ? AND therapist_id = ?",
+            (service_date, therapist_id),
+        ) is not None
 
     def _find_logo_filename() -> Optional[str]:
         static_dir = app.static_folder or ""
@@ -182,6 +204,13 @@ def create_app() -> Flask:
 
         conn = connect()
         try:
+            if _payout_exists(conn, service_date, therapist_id):
+                flash(
+                    "ชำระเงินแล้ว กรุณายกเลิกการชำระก่อนเพิ่มงาน / 支払済みを取り消してから施術を追加してください。",
+                    "error",
+                )
+                return redirect(url_for("kiosk", date=service_date, therapist_id=therapist_id, _anchor="summary"))
+
             # 最大2メニュー。割引/ポイント/指名料は1件目にのみ付けて二重計上を防ぐ。
             conn.execute(
                 """
@@ -214,14 +243,18 @@ def create_app() -> Flask:
     @app.post("/kiosk/guarantee")
     def kiosk_guarantee():
         service_date = (request.form.get("service_date") or date.today().isoformat()).strip()
-        therapist_id = int(request.form.get("therapist_id") or "0")
-        guarantee_amount = int(request.form.get("guarantee_amount") or "0")
+        try:
+            therapist_id = int(request.form.get("therapist_id") or "0")
+            guarantee_amount = int(request.form.get("guarantee_amount") or "0")
+        except (TypeError, ValueError):
+            flash("最低保証額は数字で入力してください。", "error")
+            return redirect(url_for("kiosk", date=service_date))
 
         if therapist_id <= 0:
             flash("セラピストを選択してください。", "error")
             return redirect(url_for("kiosk", date=service_date))
-        if guarantee_amount <= 0:
-            flash("最低保証額を入力してください。", "error")
+        if guarantee_amount < DAILY_MINIMUM_PAYOUT_YEN:
+            flash("最低保証額は5,000円以上で入力してください。", "error")
             return redirect(url_for("kiosk", date=service_date, therapist_id=therapist_id))
 
         conn = connect()
@@ -234,6 +267,18 @@ def create_app() -> Flask:
             if row and int(row["cnt"]) > 0:
                 flash("この日に施術があるため最低保証は登録できません。", "error")
                 return redirect(url_for("kiosk", date=service_date, therapist_id=therapist_id))
+
+            topup_row = q1(
+                conn,
+                "SELECT amount FROM payout_topups WHERE service_date = ? AND therapist_id = ?",
+                (service_date, therapist_id),
+            )
+            if topup_row:
+                flash(
+                    "กรุณาลบเงินเพิ่มก่อนบันทึกค่าจ้างขั้นต่ำ / 不足分を削除してから最低保証を登録してください。",
+                    "error",
+                )
+                return redirect(url_for("kiosk", date=service_date, therapist_id=therapist_id, _anchor="summary"))
 
             now = datetime.now().replace(microsecond=0).isoformat()
             conn.execute(
@@ -277,6 +322,134 @@ def create_app() -> Flask:
             conn.commit()
             flash("最低保証を削除しました。", "ok")
             return redirect(url_for("kiosk", date=service_date, therapist_id=therapist_id))
+        finally:
+            conn.close()
+
+    @app.post("/kiosk/payout-topup")
+    def kiosk_payout_topup():
+        service_date = (request.form.get("service_date") or date.today().isoformat()).strip()
+        try:
+            therapist_id = int(request.form.get("therapist_id") or "0")
+            topup_amount = int(request.form.get("topup_amount") or "0")
+        except (TypeError, ValueError):
+            flash("กรุณาใส่จำนวนเงินเป็นตัวเลข / 不足分は数字で入力してください。", "error")
+            return redirect(url_for("kiosk", date=service_date))
+
+        if therapist_id <= 0:
+            flash("กรุณาเลือกพนักงาน / セラピストを選択してください。", "error")
+            return redirect(url_for("kiosk", date=service_date))
+        if topup_amount <= 0:
+            flash("กรุณาใส่เงินที่ขาดมากกว่า 0 เยน / 不足分は1円以上で入力してください。", "error")
+            return redirect(url_for("kiosk", date=service_date, therapist_id=therapist_id))
+
+        conn = connect()
+        try:
+            treatment_row = q1(
+                conn,
+                "SELECT COUNT(*) AS cnt FROM treatments WHERE service_date = ? AND therapist_id = ?",
+                (service_date, therapist_id),
+            )
+            if not treatment_row or int(treatment_row["cnt"]) == 0:
+                flash(
+                    "วันนี้ยังไม่มีงาน กรุณาใช้ค่าจ้างขั้นต่ำ / 施術がない日は「最低保証」を使ってください。",
+                    "error",
+                )
+                return redirect(url_for("kiosk", date=service_date, therapist_id=therapist_id))
+
+            payout_row = q1(
+                conn,
+                "SELECT id FROM payouts WHERE service_date = ? AND therapist_id = ?",
+                (service_date, therapist_id),
+            )
+            if payout_row:
+                flash(
+                    "ชำระเงินแล้ว กรุณายกเลิกการชำระก่อนแก้ไข / 支払済みを取り消してから不足分を変更してください。",
+                    "error",
+                )
+                return redirect(url_for("kiosk", date=service_date, therapist_id=therapist_id))
+
+            summaries, _ = _compute_daily_summary(conn, service_date)
+            target = next(
+                (s for s in summaries if int(s["therapist_id"]) == therapist_id),
+                None,
+            )
+            base_payout = int(target["base_payout_total"]) if target else 0
+            maximum_topup = max(0, DAILY_MINIMUM_PAYOUT_YEN - base_payout)
+            if maximum_topup == 0:
+                flash("ค่าจ้างถึง 5,000 เยนแล้ว / 施術分が5,000円以上のため不足はありません。", "error")
+                return redirect(url_for("kiosk", date=service_date, therapist_id=therapist_id))
+            if topup_amount > maximum_topup:
+                flash(
+                    f"ใส่ได้ไม่เกิน {maximum_topup:,} เยน / 不足分は最大{maximum_topup:,}円です。",
+                    "error",
+                )
+                return redirect(url_for("kiosk", date=service_date, therapist_id=therapist_id))
+
+            conn.execute(
+                """
+                INSERT INTO payout_topups(service_date, therapist_id, amount, updated_at)
+                VALUES (?, ?, ?, ?)
+                ON CONFLICT(service_date, therapist_id)
+                DO UPDATE SET amount=excluded.amount, updated_at=excluded.updated_at
+                """,
+                (service_date, therapist_id, topup_amount, now_iso()),
+            )
+            conn.commit()
+            flash("บันทึกเงินเพิ่มแล้ว / 不足分を保存しました。", "ok")
+            return redirect(
+                url_for(
+                    "kiosk",
+                    date=service_date,
+                    therapist_id=therapist_id,
+                    _anchor=f"summary-staff-{therapist_id}",
+                )
+            )
+        finally:
+            conn.close()
+
+    @app.post("/kiosk/payout-topup/delete")
+    def kiosk_payout_topup_delete():
+        service_date = (request.form.get("service_date") or date.today().isoformat()).strip()
+        try:
+            therapist_id = int(request.form.get("therapist_id") or "0")
+        except (TypeError, ValueError):
+            therapist_id = 0
+
+        if therapist_id <= 0:
+            flash("กรุณาเลือกพนักงาน / セラピストを選択してください。", "error")
+            return redirect(url_for("kiosk", date=service_date))
+
+        conn = connect()
+        try:
+            payout_row = q1(
+                conn,
+                "SELECT id FROM payouts WHERE service_date = ? AND therapist_id = ?",
+                (service_date, therapist_id),
+            )
+            if payout_row:
+                flash(
+                    "ชำระเงินแล้ว กรุณายกเลิกการชำระก่อนลบ / 支払済みを取り消してから不足分を削除してください。",
+                    "error",
+                )
+                return redirect(url_for("kiosk", date=service_date, therapist_id=therapist_id))
+
+            cursor = conn.execute(
+                "DELETE FROM payout_topups WHERE service_date = ? AND therapist_id = ?",
+                (service_date, therapist_id),
+            )
+            if cursor.rowcount == 0:
+                flash("ไม่พบเงินเพิ่ม / 不足分の記録が見つかりません。", "error")
+                return redirect(url_for("kiosk", date=service_date, therapist_id=therapist_id))
+            conn.commit()
+            flash("ลบเงินเพิ่มแล้ว / 不足分を削除しました。", "ok")
+            return redirect(
+                url_for(
+                    "kiosk",
+                    date=service_date,
+                    therapist_id=therapist_id,
+                    _anchor=f"summary-staff-{therapist_id}",
+                )
+            )
         finally:
             conn.close()
 
@@ -442,6 +615,21 @@ def create_app() -> Flask:
                 flash("対象の入力が見つかりません。", "error")
                 return redirect(url_for("kiosk", _anchor="history"))
 
+            old_service_date = str(row["service_date"])
+            old_therapist_id = int(row["therapist_id"])
+            if _payout_exists(conn, old_service_date, old_therapist_id):
+                flash(
+                    "ชำระเงินแล้ว กรุณายกเลิกการชำระก่อนแก้ไขงาน / 支払済みを取り消してから施術を変更してください。",
+                    "error",
+                )
+                return redirect(url_for("kiosk", date=return_date or old_service_date, _anchor="history"))
+            if old_therapist_id != therapist_id and _payout_exists(conn, old_service_date, therapist_id):
+                flash(
+                    "พนักงานปลายทางชำระเงินแล้ว กรุณายกเลิกก่อน / 変更先が支払済みです。先に支払取消してください。",
+                    "error",
+                )
+                return redirect(url_for("kiosk", date=return_date or old_service_date, _anchor="history"))
+
             conn.execute(
                 """
                 UPDATE treatments
@@ -450,6 +638,12 @@ def create_app() -> Flask:
                 """,
                 (therapist_id, menu_id, hpb, p, r, treatment_id),
             )
+            if int(row["therapist_id"]) != therapist_id:
+                _delete_topup_if_no_treatments(
+                    conn,
+                    str(row["service_date"]),
+                    int(row["therapist_id"]),
+                )
             conn.commit()
             flash("Updated / แก้ไขแล้ว", "ok")
             back_date = return_date or str(row["service_date"])
@@ -466,7 +660,18 @@ def create_app() -> Flask:
             if not row:
                 flash("対象の入力が見つかりません。", "error")
                 return redirect(url_for("kiosk", _anchor="history"))
+            if _payout_exists(conn, str(row["service_date"]), int(row["therapist_id"])):
+                flash(
+                    "ชำระเงินแล้ว กรุณายกเลิกการชำระก่อนลบงาน / 支払済みを取り消してから施術を削除してください。",
+                    "error",
+                )
+                return redirect(url_for("kiosk", date=return_date or str(row["service_date"]), _anchor="history"))
             conn.execute("DELETE FROM treatments WHERE id = ?", (treatment_id,))
+            _delete_topup_if_no_treatments(
+                conn,
+                str(row["service_date"]),
+                int(row["therapist_id"]),
+            )
             conn.commit()
             flash("Deleted / ลบแล้ว", "ok")
             back_date = return_date or str(row["service_date"])
@@ -865,6 +1070,10 @@ def create_app() -> Flask:
 
         conn = connect()
         try:
+            if _payout_exists(conn, service_date, therapist_id):
+                flash("支払済みを取り消してから施術を追加してください。", "error")
+                return redirect(url_for("treatments_list", date=service_date))
+
             exec1(
                 conn,
                 """
@@ -900,7 +1109,23 @@ def create_app() -> Flask:
         service_date = (request.form.get("service_date") or date.today().isoformat()).strip()
         conn = connect()
         try:
+            row = q1(
+                conn,
+                "SELECT service_date, therapist_id FROM treatments WHERE id = ?",
+                (treatment_id,),
+            )
+            if not row:
+                flash("対象の施術が見つかりません。", "error")
+                return redirect(url_for("treatments_list", date=service_date))
+            if _payout_exists(conn, str(row["service_date"]), int(row["therapist_id"])):
+                flash("支払済みを取り消してから施術を削除してください。", "error")
+                return redirect(url_for("treatments_list", date=service_date))
             conn.execute("DELETE FROM treatments WHERE id = ?", (treatment_id,))
+            _delete_topup_if_no_treatments(
+                conn,
+                str(row["service_date"]),
+                int(row["therapist_id"]),
+            )
             conn.commit()
             flash("削除しました。", "ok")
             return redirect(url_for("treatments_list", date=service_date))
@@ -977,10 +1202,26 @@ def create_app() -> Flask:
 
         conn = connect()
         try:
-            row = q1(conn, "SELECT id FROM treatments WHERE id = ?", (treatment_id,))
+            row = q1(
+                conn,
+                "SELECT id, service_date, therapist_id FROM treatments WHERE id = ?",
+                (treatment_id,),
+            )
             if not row:
                 flash("対象の施術が見つかりません。", "error")
                 return redirect(url_for("treatments_list", date=service_date))
+
+            old_service_date = str(row["service_date"])
+            old_therapist_id = int(row["therapist_id"])
+            if _payout_exists(conn, old_service_date, old_therapist_id):
+                flash("支払済みを取り消してから施術を変更してください。", "error")
+                return redirect(url_for("treatments_list", date=old_service_date))
+            if (
+                (old_service_date != service_date or old_therapist_id != therapist_id)
+                and _payout_exists(conn, service_date, therapist_id)
+            ):
+                flash("変更先が支払済みです。先に支払取消してください。", "error")
+                return redirect(url_for("treatments_list", date=old_service_date))
 
             conn.execute(
                 """
@@ -1014,6 +1255,12 @@ def create_app() -> Flask:
                     treatment_id,
                 ),
             )
+            if str(row["service_date"]) != service_date or int(row["therapist_id"]) != therapist_id:
+                _delete_topup_if_no_treatments(
+                    conn,
+                    str(row["service_date"]),
+                    int(row["therapist_id"]),
+                )
             conn.commit()
             flash("施術を更新しました。", "ok")
             return redirect(url_for("treatments_list", date=service_date))
@@ -1119,15 +1366,48 @@ def create_app() -> Flask:
                     "therapist_id": tid,
                     "therapist_name": r["therapist_name"],
                     "sales_total": 0,
+                    "base_payout_total": 0,
+                    "topup_amount": 0,
                     "payout_total": 0,
                     "customer_count": 0,
+                    "is_legacy_guarantee": False,
+                    "has_treatments": True,
                 }
             per_therapist[tid]["sales_total"] = int(per_therapist[tid]["sales_total"]) + sales
+            per_therapist[tid]["base_payout_total"] = int(per_therapist[tid]["base_payout_total"]) + payout
             per_therapist[tid]["payout_total"] = int(per_therapist[tid]["payout_total"]) + payout
             if count_as_customer:
                 per_therapist[tid]["customer_count"] = int(per_therapist[tid]["customer_count"]) + int(
                     r["quantity"]
                 )
+
+        topup_rows = q(
+            conn,
+            """
+            SELECT pt.*, th.name AS therapist_name
+            FROM payout_topups pt
+            JOIN therapists th ON th.id = pt.therapist_id
+            WHERE pt.service_date = ?
+            """,
+            (service_date,),
+        )
+        for topup in topup_rows:
+            tid = int(topup["therapist_id"])
+            if tid not in per_therapist:
+                per_therapist[tid] = {
+                    "therapist_id": tid,
+                    "therapist_name": topup["therapist_name"],
+                    "sales_total": 0,
+                    "base_payout_total": 0,
+                    "topup_amount": 0,
+                    "payout_total": 0,
+                    "customer_count": 0,
+                    "is_legacy_guarantee": False,
+                    "has_treatments": False,
+                }
+            amount = int(topup["amount"])
+            per_therapist[tid]["topup_amount"] = amount
+            per_therapist[tid]["payout_total"] = int(per_therapist[tid]["base_payout_total"]) + amount
 
         payout_rows = q(
             conn,
@@ -1145,21 +1425,38 @@ def create_app() -> Flask:
             s["paid_amount"] = int(paid_map[tid]["paid_amount"]) if tid in paid_map else 0
             s["paid_at"] = paid_map[tid]["paid_at"] if tid in paid_map else None
             s["paid_method"] = paid_map[tid]["method"] if tid in paid_map else None
+            s["is_legacy_guarantee"] = (
+                tid in paid_map
+                and str(paid_map[tid]["method"] or "") == "最低保証"
+                and not bool(s["has_treatments"])
+            )
 
         for tid, p in paid_map.items():
             if tid in per_therapist:
                 continue
+            is_legacy_guarantee = str(p["method"] or "") == "最低保証"
+            paid_amount = int(p["paid_amount"])
             per_therapist[tid] = {
                 "therapist_id": tid,
                 "therapist_name": p["therapist_name"],
                 "sales_total": 0,
-                "payout_total": int(p["paid_amount"]),
+                "base_payout_total": 0 if is_legacy_guarantee else paid_amount,
+                "topup_amount": paid_amount if is_legacy_guarantee else 0,
+                "payout_total": paid_amount,
                 "customer_count": 0,
                 "paid": True,
-                "paid_amount": int(p["paid_amount"]),
+                "paid_amount": paid_amount,
                 "paid_at": p["paid_at"],
                 "paid_method": p["method"],
+                "is_legacy_guarantee": is_legacy_guarantee,
+                "has_treatments": False,
             }
+
+        for summary in per_therapist.values():
+            summary["shortfall_to_minimum"] = max(
+                0,
+                DAILY_MINIMUM_PAYOUT_YEN - int(summary["base_payout_total"]),
+            )
 
         summaries = sorted(per_therapist.values(), key=lambda x: (str(x["therapist_name"]), int(x["therapist_id"])))
         return summaries, detail_lines
@@ -1192,7 +1489,18 @@ def create_app() -> Flask:
             w.writerow([])
             w.writerow(["セラピスト別集計"])
             w.writerow(
-                ["セラピスト", "客数", "売上合計(円)", "支払合計(円)", "支払済み", "支払額(円)", "支払日時", "支払方法"]
+                [
+                    "セラピスト",
+                    "客数",
+                    "売上合計(円)",
+                    "施術分(円)",
+                    "不足分(円)",
+                    "支払合計(円)",
+                    "支払済み",
+                    "支払額(円)",
+                    "支払日時",
+                    "支払方法",
+                ]
             )
             for s in summaries:
                 w.writerow(
@@ -1200,6 +1508,8 @@ def create_app() -> Flask:
                         s["therapist_name"],
                         s["customer_count"],
                         s["sales_total"],
+                        s["base_payout_total"],
+                        s["topup_amount"],
                         s["payout_total"],
                         "済" if s["paid"] else "未",
                         s["paid_amount"],
@@ -1344,6 +1654,53 @@ def create_app() -> Flask:
             return q(conn, base_sql + " AND t.therapist_id = ? ORDER BY th.name ASC, t.service_date ASC, t.id ASC", (date_from, date_to, therapist_id))
         return q(conn, base_sql + " ORDER BY th.name ASC, t.service_date ASC, t.id ASC", (date_from, date_to))
 
+    def _payout_topup_rows(conn, date_from: str, date_to: str, therapist_id: Optional[int] = None):
+        base_sql = """
+            SELECT
+              pt.service_date,
+              pt.therapist_id,
+              pt.amount,
+              pt.updated_at,
+              th.name AS therapist_name
+            FROM payout_topups pt
+            JOIN therapists th ON th.id = pt.therapist_id
+            WHERE pt.service_date BETWEEN ? AND ?
+        """
+        if therapist_id:
+            return q(
+                conn,
+                base_sql + " AND pt.therapist_id = ? ORDER BY th.name ASC, pt.service_date ASC",
+                (date_from, date_to, therapist_id),
+            )
+        return q(conn, base_sql + " ORDER BY th.name ASC, pt.service_date ASC", (date_from, date_to))
+
+    def _legacy_guarantee_rows(conn, date_from: str, date_to: str, therapist_id: Optional[int] = None):
+        base_sql = """
+            SELECT
+              p.service_date,
+              p.therapist_id,
+              p.paid_amount AS amount,
+              p.paid_at AS updated_at,
+              th.name AS therapist_name
+            FROM payouts p
+            JOIN therapists th ON th.id = p.therapist_id
+            WHERE p.service_date BETWEEN ? AND ?
+              AND p.method = '最低保証'
+              AND NOT EXISTS (
+                SELECT 1
+                FROM treatments t
+                WHERE t.service_date = p.service_date
+                  AND t.therapist_id = p.therapist_id
+              )
+        """
+        if therapist_id:
+            return q(
+                conn,
+                base_sql + " AND p.therapist_id = ? ORDER BY th.name ASC, p.service_date ASC",
+                (date_from, date_to, therapist_id),
+            )
+        return q(conn, base_sql + " ORDER BY th.name ASC, p.service_date ASC", (date_from, date_to))
+
     def _compute_staff_details(rows) -> List[Dict[str, object]]:
         detail_lines: List[Dict[str, object]] = []
         for r in rows:
@@ -1487,6 +1844,8 @@ def create_app() -> Flask:
             therapists = q(conn, "SELECT * FROM therapists ORDER BY is_active DESC, name ASC, id ASC")
             rows = _staff_report_rows(conn, date_from, date_to, therapist_id or None)
             details = _compute_staff_details(rows)
+            topups = _payout_topup_rows(conn, date_from, date_to, therapist_id or None)
+            legacy_guarantees = _legacy_guarantee_rows(conn, date_from, date_to, therapist_id or None)
             totals: Dict[int, Dict[str, object]] = {}
             for d in details:
                 tid = int(d["therapist_id"])
@@ -1494,6 +1853,7 @@ def create_app() -> Flask:
                     totals[tid] = {
                         "therapist_name": d["therapist_name"],
                         "sales": 0,
+                        "topup": 0,
                         "payout": 0,
                         "line_count": 0,
                         "customer_count": 0,
@@ -1503,6 +1863,20 @@ def create_app() -> Flask:
                 totals[tid]["line_count"] = int(totals[tid]["line_count"]) + 1
                 if int(d.get("count_as_customer") or 0):
                     totals[tid]["customer_count"] = int(totals[tid]["customer_count"]) + int(d["quantity"])
+            for supplement in [*topups, *legacy_guarantees]:
+                tid = int(supplement["therapist_id"])
+                if tid not in totals:
+                    totals[tid] = {
+                        "therapist_name": supplement["therapist_name"],
+                        "sales": 0,
+                        "topup": 0,
+                        "payout": 0,
+                        "line_count": 0,
+                        "customer_count": 0,
+                    }
+                amount = int(supplement["amount"])
+                totals[tid]["topup"] = int(totals[tid]["topup"]) + amount
+                totals[tid]["payout"] = int(totals[tid]["payout"]) + amount
             therapist_totals = sorted(totals.values(), key=lambda x: str(x["therapist_name"]))
             return render_template(
                 "report_staff.html",
@@ -1526,6 +1900,8 @@ def create_app() -> Flask:
         try:
             rows = _staff_report_rows(conn, date_from, date_to, therapist_id or None)
             details = _compute_staff_details(rows)
+            topups = _payout_topup_rows(conn, date_from, date_to, therapist_id or None)
+            legacy_guarantees = _legacy_guarantee_rows(conn, date_from, date_to, therapist_id or None)
             output = io.StringIO()
             w = csv.writer(output)
             w.writerow(
@@ -1564,6 +1940,44 @@ def create_app() -> Flask:
                     cust_qty,
                     d["notes"],
                 ])
+            for topup in topups:
+                w.writerow(
+                    [
+                        topup["therapist_name"],
+                        topup["service_date"],
+                        "最低保証の不足分",
+                        "",
+                        "",
+                        "",
+                        "",
+                        "",
+                        0,
+                        "",
+                        "",
+                        int(topup["amount"]),
+                        0,
+                        "手動入力",
+                    ]
+                )
+            for guarantee in legacy_guarantees:
+                w.writerow(
+                    [
+                        guarantee["therapist_name"],
+                        guarantee["service_date"],
+                        "最低保証（客数0人）",
+                        "",
+                        "",
+                        "",
+                        "",
+                        "",
+                        0,
+                        "",
+                        "",
+                        int(guarantee["amount"]),
+                        0,
+                        "支払済み",
+                    ]
+                )
             bom = "\ufeff"
             csv_bytes = (bom + output.getvalue()).encode("utf-8")
             therapist_part = f"_t{therapist_id}" if therapist_id else "_all"
@@ -1690,6 +2104,27 @@ def create_app() -> Flask:
                 return redirect(url_for("report_daily", date=service_date))
 
             paid_amount = int(target["payout_total"])
+            required_topup = max(
+                0,
+                DAILY_MINIMUM_PAYOUT_YEN - int(target["base_payout_total"]),
+            )
+            current_topup = int(target["topup_amount"])
+            if current_topup != required_topup:
+                if required_topup == 0:
+                    message = "施術分が5,000円以上です。登録済みの不足分を削除してから支払済みにしてください。"
+                elif current_topup == 0:
+                    message = f"支払合計が{paid_amount:,}円です。不足分{required_topup:,}円を入力してから支払済みにしてください。"
+                else:
+                    message = f"不足分を現在必要な{required_topup:,}円にしてから支払済みにしてください。"
+                flash(message, "error")
+                return redirect(url_for("report_daily", date=service_date))
+            if paid_amount < DAILY_MINIMUM_PAYOUT_YEN:
+                missing_amount = DAILY_MINIMUM_PAYOUT_YEN - paid_amount
+                flash(
+                    f"支払合計が{paid_amount:,}円です。不足分{missing_amount:,}円を入力してから支払済みにしてください。",
+                    "error",
+                )
+                return redirect(url_for("report_daily", date=service_date))
             now = datetime.now().replace(microsecond=0).isoformat()
             conn.execute(
                 """
@@ -1718,6 +2153,29 @@ def create_app() -> Flask:
             unpaid = [s for s in summaries if not s.get("paid")]
             if not unpaid:
                 flash("支払い済みにする未払いの集計がありません。", "error")
+                return redirect(url_for("report_daily", date=service_date))
+
+            below_minimum = [s for s in unpaid if int(s["payout_total"]) < DAILY_MINIMUM_PAYOUT_YEN]
+            if below_minimum:
+                names = "、".join(str(s["therapist_name"]) for s in below_minimum)
+                flash(
+                    f"{names}の支払合計が5,000円未満です。不足分を入力してからまとめて支払済みにしてください。",
+                    "error",
+                )
+                return redirect(url_for("report_daily", date=service_date))
+
+            stale_topups = [
+                s
+                for s in unpaid
+                if int(s["topup_amount"])
+                != max(0, DAILY_MINIMUM_PAYOUT_YEN - int(s["base_payout_total"]))
+            ]
+            if stale_topups:
+                names = "、".join(str(s["therapist_name"]) for s in stale_topups)
+                flash(
+                    f"{names}の不足分が現在の施術分と合いません。不足分を修正してからまとめて支払済みにしてください。",
+                    "error",
+                )
                 return redirect(url_for("report_daily", date=service_date))
 
             now = datetime.now().replace(microsecond=0).isoformat()

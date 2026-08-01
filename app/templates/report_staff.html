@@ -43,6 +43,7 @@
             <th class="right">客数</th>
             <th class="right muted small">明細行</th>
             <th class="right">売上合計</th>
+            <th class="right">保証・不足分</th>
             <th class="right">支払合計</th>
           </tr>
         </thead>
@@ -53,6 +54,7 @@
               <td class="right mono">{{ t.customer_count }}</td>
               <td class="right mono muted small">{{ t.line_count }}</td>
               <td class="right mono">{{ "{:,}".format(t.sales) }}円</td>
+              <td class="right mono">{{ "{:,}".format(t.topup) }}円</td>
               <td class="right mono strong">{{ "{:,}".format(t.payout) }}円</td>
             </tr>
           {% endfor %}

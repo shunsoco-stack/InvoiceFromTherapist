@@ -40,6 +40,8 @@
             <th>セラピスト</th>
             <th class="right">客数</th>
             <th class="right">売上合計</th>
+            <th class="right">施術分</th>
+            <th class="right">不足分</th>
             <th class="right">支払合計</th>
             <th>支払状況</th>
             <th></th>
@@ -51,6 +53,8 @@
               <td>{{ s.therapist_name }}</td>
               <td class="right mono">{{ s.customer_count }}</td>
               <td class="right mono">{{ "{:,}".format(s.sales_total) }}円</td>
+              <td class="right mono">{{ "{:,}".format(s.base_payout_total) }}円</td>
+              <td class="right mono">{{ "{:,}".format(s.topup_amount) }}円</td>
               <td class="right mono strong">{{ "{:,}".format(s.payout_total) }}円</td>
               <td>
                 {% if s.paid %}
@@ -79,7 +83,7 @@
             </tr>
           {% endfor %}
           {% if summaries|length == 0 %}
-            <tr><td colspan="6" class="muted">この日の施術記録がありません。</td></tr>
+            <tr><td colspan="8" class="muted">この日の施術記録がありません。</td></tr>
           {% endif %}
         </tbody>
       </table>

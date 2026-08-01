@@ -435,6 +435,33 @@ input::placeholder{ color: rgba(169,180,202,.7); }
   flex-wrap: wrap;
   margin-top: 8px;
 }
+.kioskAdjustment{
+  display:flex;
+  flex-direction:column;
+  gap:8px;
+  padding:12px;
+  border:2px solid rgba(184,109,148,.55);
+  border-radius:14px;
+  background:#fff8fb;
+}
+.kioskAdjustment__title{
+  font-weight:800;
+  color:#662044;
+}
+.kioskAdjustment__help{
+  font-size:14px;
+  line-height:1.6;
+}
+.kioskAdjustment__controls,
+.kioskAdjustment__form{
+  display:flex;
+  align-items:center;
+  gap:10px;
+  flex-wrap:wrap;
+}
+.kioskAdjustment__input{
+  width:160px;
+}
 .kioskEstimate{
   width: 100%;
   border: 1px solid var(--border);
@@ -491,6 +518,7 @@ input::placeholder{ color: rgba(169,180,202,.7); }
   .kioskSheets{ grid-template-columns: 1fr 1fr; }
 }
 .kioskSheet{
+  scroll-margin-top: 24px;
   background: rgba(255,255,255,.96);
   border: 1px solid rgba(241,198,220,.95);
   border-radius: 18px;

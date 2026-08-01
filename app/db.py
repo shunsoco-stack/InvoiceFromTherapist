@@ -60,6 +60,15 @@ CREATE TABLE IF NOT EXISTS payouts (
   UNIQUE(service_date, therapist_id)
 );
 
+CREATE TABLE IF NOT EXISTS payout_topups (
+  service_date TEXT NOT NULL, -- YYYY-MM-DD
+  therapist_id INTEGER NOT NULL,
+  amount INTEGER NOT NULL CHECK(amount >= 0), -- yen, manually entered daily shortfall
+  updated_at TEXT NOT NULL,
+  PRIMARY KEY(service_date, therapist_id),
+  FOREIGN KEY (therapist_id) REFERENCES therapists(id)
+);
+
 CREATE TABLE IF NOT EXISTS supplies (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   name TEXT NOT NULL,
@@ -78,6 +87,7 @@ CREATE TABLE IF NOT EXISTS supply_alerts (
 
 CREATE INDEX IF NOT EXISTS idx_treatments_date ON treatments(service_date);
 CREATE INDEX IF NOT EXISTS idx_treatments_therapist ON treatments(therapist_id);
+CREATE INDEX IF NOT EXISTS idx_payout_topups_date ON payout_topups(service_date);
 CREATE INDEX IF NOT EXISTS idx_supply_alerts_supply ON supply_alerts(supply_id);
 """
 

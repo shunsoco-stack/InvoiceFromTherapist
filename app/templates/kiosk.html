@@ -66,7 +66,7 @@
                      class="kioskInput"
                      type="number"
                      inputmode="numeric"
-                     min="0"
+                     min="5000"
                      placeholder="5000"
                      value="{% if selected_payout and selected_payout.method == '最低保証' %}{{ selected_payout.paid_amount }}{% endif %}"
                      form="kioskGuaranteeForm" />
@@ -183,7 +183,7 @@
               {% set hpb_total = hpb_totals.get(s.therapist_id, 0) %}
               {% set p_total = p_totals.get(s.therapist_id, 0) %}
               {% set r_total = r_totals.get(s.therapist_id, 0) %}
-              <div class="kioskSheet">
+              <div class="kioskSheet" id="summary-staff-{{ s.therapist_id }}">
                 <table class="kioskSheetTable">
                   <thead>
                     <tr>
@@ -227,9 +227,71 @@
                       <td class="kioskSheetTd kioskSheetTd--right mono">{{ "{:,}".format(s.sales_total) }}</td>
                     </tr>
                     <tr>
-                      <td class="kioskSheetTd">ค่าจ้างพนักงาน / スタッフ</td>
+                      <td class="kioskSheetTd">ค่าจ้างจากงาน / 施術分</td>
+                      <td class="kioskSheetTd kioskSheetTd--right mono">{{ "{:,}".format(s.base_payout_total) }}</td>
+                    </tr>
+                    <tr>
+                      <td class="kioskSheetTd">
+                        {% if s.is_legacy_guarantee %}ค่าจ้างขั้นต่ำ / 最低保証{% else %}เงินเพิ่ม / 不足分{% endif %}
+                      </td>
+                      <td class="kioskSheetTd kioskSheetTd--right mono">{{ "{:,}".format(s.topup_amount) }}</td>
+                    </tr>
+                    <tr>
+                      <td class="kioskSheetTd strong">รับทั้งหมด / 支払合計</td>
                       <td class="kioskSheetTd kioskSheetTd--right mono strong">{{ "{:,}".format(s.payout_total) }}</td>
                     </tr>
+                    {% if not s.is_legacy_guarantee and (s.shortfall_to_minimum|int > 0 or s.topup_amount|int > 0) %}
+                      <tr>
+                        <td class="kioskSheetTd" colspan="2">
+                          <div class="kioskAdjustment">
+                            <div class="kioskAdjustment__title">เงินเพิ่มให้ครบ 5,000 เยน / 5,000円までの不足分</div>
+                            <div class="kioskAdjustment__help muted" id="topup-help-{{ s.therapist_id }}">
+                              ใส่เฉพาะจำนวนเงินที่ขาด / 足りない金額だけ入力
+                              {% if s.payout_total|int == 5000 %}
+                                （ครบ 5,000 เยนแล้ว / 5,000円になっています）
+                              {% elif s.topup_amount|int > s.shortfall_to_minimum|int %}
+                                （เงินเพิ่มสูงเกินไป สูงสุด {{ "{:,}".format(s.shortfall_to_minimum) }} เยน / 不足分は最大{{ "{:,}".format(s.shortfall_to_minimum) }}円）
+                              {% else %}
+                                （ใส่ {{ "{:,}".format(s.shortfall_to_minimum) }} เยน เพื่อให้ครบ / 入力する不足分：{{ "{:,}".format(s.shortfall_to_minimum) }}円）
+                              {% endif %}
+                            </div>
+                            <div class="kioskAdjustment__controls">
+                              <form class="kioskAdjustment__form" method="post" action="{{ url_for('kiosk_payout_topup') }}">
+                                <input type="hidden" name="service_date" value="{{ service_date }}" />
+                                <input type="hidden" name="therapist_id" value="{{ s.therapist_id }}" />
+                                <label class="sr-only" for="topup-amount-{{ s.therapist_id }}">เงินเพิ่ม (เยน) / 不足分（円）</label>
+                                <input id="topup-amount-{{ s.therapist_id }}"
+                                       class="kioskInput kioskAdjustment__input"
+                                       name="topup_amount"
+                                       type="number"
+                                       inputmode="numeric"
+                                       min="1"
+                                       step="1"
+                                       value="{{ s.topup_amount if s.topup_amount else s.shortfall_to_minimum }}"
+                                       aria-describedby="topup-help-{{ s.therapist_id }}"
+                                       required
+                                       {% if s.paid %}disabled{% endif %} />
+                                <button class="btn btn--secondary kioskSmallBtn" type="submit" {% if s.paid %}disabled{% endif %}>
+                                  บันทึกเงินเพิ่ม / 不足分を保存
+                                </button>
+                              </form>
+                              {% if s.topup_amount|int > 0 %}
+                                <form method="post" action="{{ url_for('kiosk_payout_topup_delete') }}" onsubmit="return confirm('ต้องการลบเงินเพิ่มหรือไม่？ / 不足分を削除しますか？');">
+                                  <input type="hidden" name="service_date" value="{{ service_date }}" />
+                                  <input type="hidden" name="therapist_id" value="{{ s.therapist_id }}" />
+                                  <button class="btn btn--danger kioskSmallBtn" type="submit" {% if s.paid %}disabled{% endif %}>
+                                    ลบเงินเพิ่ม / 不足分を削除
+                                  </button>
+                                </form>
+                              {% endif %}
+                            </div>
+                            {% if s.paid %}
+                              <div class="kioskAdjustment__help muted">ชำระเงินแล้ว หากต้องการแก้ไขให้ยกเลิกการชำระก่อน / 支払済みのため、変更する場合は先に支払取消してください。</div>
+                            {% endif %}
+                          </div>
+                        </td>
+                      </tr>
+                    {% endif %}
                     <tr>
                       <td class="kioskSheetTd">ส่วนของร้าน / 店舗</td>
                       <td class="kioskSheetTd kioskSheetTd--right mono">{{ "{:,}".format(shop_share) }}</td>
@@ -307,6 +369,7 @@
         <ul class="list">
           <li lang="th"><b>ลำดับการกด:</b> พนักงาน → เมนูหลัก →（เมนูเสริม）→ บันทึก</li>
           <li lang="th">เมนูเสริมรวมในยอดขายและค่าจ้าง แต่ไม่นับลูกค้าเพิ่ม</li>
+          <li lang="th">ถ้าค่าจ้างยังไม่ถึง 5,000 เยน ให้ใส่เฉพาะเงินที่ขาดในช่อง “เงินเพิ่ม”</li>
           <li lang="th">ถ้ากรอกผิด ให้แก้ไขหรือลบในประวัติของวันที่เลือก</li>
         </ul>
       </section>
