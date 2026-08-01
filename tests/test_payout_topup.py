@@ -88,6 +88,21 @@ class PayoutTopupTests(unittest.TestCase):
             follow_redirects=follow_redirects,
         )
 
+    def _add_therapist(self, name):
+        conn = connect()
+        try:
+            therapist_id = conn.execute(
+                """
+                INSERT INTO therapists(name, commission_type, commission_value, is_active, created_at)
+                VALUES (?, ?, ?, ?, ?)
+                """,
+                (name, "percent", 50, 1, now_iso()),
+            ).lastrowid
+            conn.commit()
+            return therapist_id
+        finally:
+            conn.close()
+
     def _daily_summary_rows(self):
         response = self.client.get(f"/reports/daily.csv?date={self.service_date}")
         self.assertEqual(response.status_code, 200)
@@ -215,7 +230,10 @@ class PayoutTopupTests(unittest.TestCase):
             data={"service_date": self.service_date, "therapist_id": self.therapist_id},
             follow_redirects=True,
         )
-        self.assertIn("不足分2,500円を入力してから支払済み", individual.get_data(as_text=True))
+        self.assertIn(
+            "不足分2,500円を入力してから支払済みにするか",
+            individual.get_data(as_text=True),
+        )
 
         bulk = self.client.post(
             "/payouts/mark_paid_all",
@@ -242,6 +260,150 @@ class PayoutTopupTests(unittest.TestCase):
         finally:
             conn.close()
         self.assertEqual(paid_amount, 5000)
+
+    def test_below_minimum_without_explicit_exception_stays_unpaid(self):
+        self._add_treatment()
+
+        response = self.client.post(
+            "/payouts/mark_paid",
+            data={
+                "service_date": self.service_date,
+                "therapist_id": self.therapist_id,
+                "method": "現金",
+            },
+            follow_redirects=True,
+        )
+
+        body = response.get_data(as_text=True)
+        self.assertIn("不足分2,500円を入力してから支払済みにするか", body)
+        self.assertIn("例外：この金額で支払済", body)
+        conn = connect()
+        try:
+            payout_count = conn.execute("SELECT COUNT(*) FROM payouts").fetchone()[0]
+        finally:
+            conn.close()
+        self.assertEqual(payout_count, 0)
+
+    def test_explicit_below_minimum_exception_records_payment_and_audit_note(self):
+        self._add_treatment()
+
+        response = self.client.post(
+            "/payouts/mark_paid",
+            data={
+                "service_date": self.service_date,
+                "therapist_id": self.therapist_id,
+                "method": "現金",
+                "exception_reason": "午前のみ勤務",
+                "notes": "管理者確認済み",
+                "allow_below_minimum": "1",
+            },
+            follow_redirects=True,
+        )
+
+        self.assertIn(
+            "例外（午前のみ勤務）として、2,500円で支払い済みにしました",
+            response.get_data(as_text=True),
+        )
+        conn = connect()
+        try:
+            payout = conn.execute(
+                """
+                SELECT paid_amount, method, notes
+                FROM payouts
+                WHERE service_date = ? AND therapist_id = ?
+                """,
+                (self.service_date, self.therapist_id),
+            ).fetchone()
+        finally:
+            conn.close()
+
+        self.assertIsNotNone(payout)
+        self.assertEqual((payout["paid_amount"], payout["method"]), (2500, "現金"))
+        self.assertIn("最低保証対象外（理由：午前のみ勤務）", payout["notes"])
+        self.assertIn("管理者確認済み", payout["notes"])
+        self.assertIn("午前のみ勤務", payout["notes"])
+
+        payouts_csv = self.client.get("/reports/payouts.csv").data.decode("utf-8-sig")
+        self.assertIn("最低保証対象外（理由：午前のみ勤務）", payouts_csv)
+        self.assertIn("管理者確認済み", payouts_csv)
+        self.assertIn("午前のみ勤務", payouts_csv)
+
+    def test_below_minimum_exception_requires_a_reason(self):
+        self._add_treatment()
+
+        response = self.client.post(
+            "/payouts/mark_paid",
+            data={
+                "service_date": self.service_date,
+                "therapist_id": self.therapist_id,
+                "allow_below_minimum": "1",
+                "exception_reason": "",
+            },
+            follow_redirects=True,
+        )
+
+        self.assertIn("例外理由を入力してください", response.get_data(as_text=True))
+        conn = connect()
+        try:
+            payout_count = conn.execute("SELECT COUNT(*) FROM payouts").fetchone()[0]
+        finally:
+            conn.close()
+        self.assertEqual(payout_count, 0)
+
+    def test_daily_report_exposes_below_minimum_exception_action_and_status(self):
+        self._add_treatment()
+
+        unpaid_body = self.client.get(
+            f"/reports/daily?date={self.service_date}"
+        ).get_data(as_text=True)
+        self.assertIn('name="allow_below_minimum"', unpaid_body)
+        self.assertIn('value="1"', unpaid_body)
+        self.assertIn('name="exception_reason"', unpaid_body)
+        self.assertIn('<option value="">เลือกเหตุผล / 理由を選択</option>', unpaid_body)
+        self.assertIn('<option value="短時間勤務">', unpaid_body)
+        self.assertIn("例外：2,500円で支払済にする", unpaid_body)
+
+        self.client.post(
+            "/payouts/mark_paid",
+            data={
+                "service_date": self.service_date,
+                "therapist_id": self.therapist_id,
+                "allow_below_minimum": "1",
+                "exception_reason": "短時間勤務",
+            },
+        )
+        paid_body = self.client.get(
+            f"/reports/daily?date={self.service_date}"
+        ).get_data(as_text=True)
+        self.assertIn("支払済", paid_body)
+        self.assertIn("最低保証対象外", paid_body)
+        self.assertIn("短時間勤務", paid_body)
+
+    def test_bulk_remains_all_or_nothing_when_one_staff_is_below_minimum(self):
+        eligible_therapist_id = self._add_therapist("支払可能スタッフ")
+        self._add_treatment()
+        self._add_treatment(therapist_id=eligible_therapist_id)
+        self._add_treatment(therapist_id=eligible_therapist_id)
+
+        response = self.client.post(
+            "/payouts/mark_paid_all",
+            data={"service_date": self.service_date},
+            follow_redirects=True,
+        )
+
+        body = response.get_data(as_text=True)
+        self.assertIn("テストスタッフの支払合計が5,000円未満", body)
+        self.assertIn("個別に「例外：この金額で支払済」", body)
+        conn = connect()
+        try:
+            payout_count = conn.execute(
+                "SELECT COUNT(*) FROM payouts WHERE service_date = ?",
+                (self.service_date,),
+            ).fetchone()[0]
+        finally:
+            conn.close()
+
+        self.assertEqual(payout_count, 0)
 
     def test_topup_can_be_updated_and_deleted_without_locking_treatments(self):
         self._add_treatment()

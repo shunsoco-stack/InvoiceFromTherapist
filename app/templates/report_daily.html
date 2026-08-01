@@ -49,6 +49,7 @@
         </thead>
         <tbody>
           {% for s in summaries %}
+            {% set payout_total_label = "{:,}".format(s.payout_total) %}
             <tr>
               <td>{{ s.therapist_name }}</td>
               <td class="right mono">{{ s.customer_count }}</td>
@@ -57,12 +58,18 @@
               <td class="right mono">{{ "{:,}".format(s.topup_amount) }}円</td>
               <td class="right mono strong">{{ "{:,}".format(s.payout_total) }}円</td>
               <td>
-                {% if s.paid %}
-                  <span class="pill pill--ok">支払済</span>
-                  <span class="muted small">{{ s.paid_at }}{% if s.paid_method %}（{{ s.paid_method }}）{% endif %}</span>
-                {% else %}
-                  <span class="pill">未</span>
-                {% endif %}
+                <div class="payoutStatus">
+                  {% if s.paid %}
+                    <span class="pill pill--ok">支払済</span>
+                    {% if s.minimum_payout_exception %}
+                      <span class="pill pill--warning" lang="th">กรณีพิเศษ / <span lang="ja">最低保証対象外</span></span>
+                      <span class="muted small">{{ s.paid_notes }}</span>
+                    {% endif %}
+                    <span class="muted small">{{ s.paid_at }}{% if s.paid_method %}（{{ s.paid_method }}）{% endif %}</span>
+                  {% else %}
+                    <span class="pill">未</span>
+                  {% endif %}
+                </div>
               </td>
               <td class="right">
                 {% if s.paid %}
@@ -72,11 +79,38 @@
                     <button class="btn btn--secondary" type="submit">支払取消</button>
                   </form>
                 {% else %}
-                  <form class="inline" method="post" action="{{ url_for('payout_mark_paid') }}">
+                  <form class="inline payoutAction" method="post" action="{{ url_for('payout_mark_paid') }}">
                     <input type="hidden" name="service_date" value="{{ service_date }}" />
                     <input type="hidden" name="therapist_id" value="{{ s.therapist_id }}" />
-                    <input name="method" placeholder="方法（例：現金）" />
+                    <input name="method" placeholder="方法（例：現金）" aria-label="支払方法" />
                     <button class="btn" type="submit">支払済にする</button>
+                    {% if s.has_treatments and s.payout_total|int < 5000 %}
+                      <div class="payoutException">
+                        <p class="payoutException__help" lang="th">
+                          ทำงานไม่เต็มวันเท่านั้น / <span lang="ja">短時間勤務など、例外の場合のみ</span>
+                        </p>
+                        <label class="payoutException__label"
+                               for="exception-reason-{{ s.therapist_id }}"
+                               lang="th">
+                          เหตุผล / <span lang="ja">例外理由</span>
+                        </label>
+                        <select id="exception-reason-{{ s.therapist_id }}"
+                                class="payoutException__reason"
+                                name="exception_reason">
+                          <option value="">เลือกเหตุผล / 理由を選択</option>
+                          <option value="短時間勤務">ทำงานไม่เต็มวัน / 短時間勤務</option>
+                          <option value="早退">กลับก่อนเวลา / 早退</option>
+                          <option value="その他">อื่น ๆ / その他</option>
+                        </select>
+                        <button class="btn btn--secondary payoutException__button"
+                                type="submit"
+                                name="allow_below_minimum"
+                                value="1"
+                                onclick="return confirm('กรณีพิเศษทำงานไม่เต็มวัน: ยืนยันจ่าย {{ payout_total_label }} เยนหรือไม่?\n短時間勤務などの例外として、{{ payout_total_label }}円で支払済みにしますか？');">
+                          กรณีพิเศษ: จ่าย {{ payout_total_label }} เยน / 例外：{{ payout_total_label }}円で支払済にする
+                        </button>
+                      </div>
+                    {% endif %}
                   </form>
                 {% endif %}
               </td>

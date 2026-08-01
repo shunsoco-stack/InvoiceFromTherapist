@@ -13,6 +13,7 @@ from app.db import connect, exec1, init_db, now_iso, q, q1
 
 
 DAILY_MINIMUM_PAYOUT_YEN = 5000
+MINIMUM_PAYOUT_EXCEPTION_NOTE_PREFIX = "最低保証対象外"
 
 
 def create_app() -> Flask:
@@ -1421,13 +1422,17 @@ def create_app() -> Flask:
         )
         paid_map = {int(p["therapist_id"]): p for p in payout_rows}
         for tid, s in per_therapist.items():
-            s["paid"] = tid in paid_map
-            s["paid_amount"] = int(paid_map[tid]["paid_amount"]) if tid in paid_map else 0
-            s["paid_at"] = paid_map[tid]["paid_at"] if tid in paid_map else None
-            s["paid_method"] = paid_map[tid]["method"] if tid in paid_map else None
+            payout_row = paid_map.get(tid)
+            paid_notes = str(payout_row["notes"] or "") if payout_row else ""
+            s["paid"] = payout_row is not None
+            s["paid_amount"] = int(payout_row["paid_amount"]) if payout_row else 0
+            s["paid_at"] = payout_row["paid_at"] if payout_row else None
+            s["paid_method"] = payout_row["method"] if payout_row else None
+            s["paid_notes"] = paid_notes
+            s["minimum_payout_exception"] = MINIMUM_PAYOUT_EXCEPTION_NOTE_PREFIX in paid_notes
             s["is_legacy_guarantee"] = (
-                tid in paid_map
-                and str(paid_map[tid]["method"] or "") == "最低保証"
+                payout_row is not None
+                and str(payout_row["method"] or "") == "最低保証"
                 and not bool(s["has_treatments"])
             )
 
@@ -1448,6 +1453,9 @@ def create_app() -> Flask:
                 "paid_amount": paid_amount,
                 "paid_at": p["paid_at"],
                 "paid_method": p["method"],
+                "paid_notes": str(p["notes"] or ""),
+                "minimum_payout_exception": MINIMUM_PAYOUT_EXCEPTION_NOTE_PREFIX
+                in str(p["notes"] or ""),
                 "is_legacy_guarantee": is_legacy_guarantee,
                 "has_treatments": False,
             }
@@ -2094,6 +2102,8 @@ def create_app() -> Flask:
         therapist_id = int(request.form.get("therapist_id") or "0")
         method = (request.form.get("method") or "").strip() or None
         notes = (request.form.get("notes") or "").strip() or None
+        allow_below_minimum = request.form.get("allow_below_minimum") == "1"
+        exception_reason = (request.form.get("exception_reason") or "").strip()
 
         conn = connect()
         try:
@@ -2109,7 +2119,38 @@ def create_app() -> Flask:
                 DAILY_MINIMUM_PAYOUT_YEN - int(target["base_payout_total"]),
             )
             current_topup = int(target["topup_amount"])
-            if current_topup != required_topup:
+            is_below_minimum = paid_amount < DAILY_MINIMUM_PAYOUT_YEN
+            if is_below_minimum and allow_below_minimum:
+                if not bool(target.get("has_treatments")):
+                    flash("施術記録がない日は、この例外では支払済みにできません。", "error")
+                    return redirect(url_for("report_daily", date=service_date))
+                if not exception_reason:
+                    flash("กรุณาใส่เหตุผล / 例外理由を入力してください。", "error")
+                    return redirect(url_for("report_daily", date=service_date))
+                if len(exception_reason) > 100:
+                    flash("例外理由は100文字以内で入力してください。", "error")
+                    return redirect(url_for("report_daily", date=service_date))
+                exception_note = (
+                    f"{MINIMUM_PAYOUT_EXCEPTION_NOTE_PREFIX}（理由：{exception_reason}）"
+                )
+                notes = (
+                    f"{exception_note} / {notes}"
+                    if notes
+                    else exception_note
+                )
+            elif is_below_minimum:
+                topup_instruction = (
+                    f"不足分{required_topup:,}円を入力してから支払済みにする"
+                    if current_topup == 0
+                    else f"不足分を{required_topup:,}円にしてから支払済みにする"
+                )
+                flash(
+                    f"支払合計が{paid_amount:,}円です。{topup_instruction}か、"
+                    "短時間勤務などの場合は「例外：この金額で支払済」を選んでください。",
+                    "error",
+                )
+                return redirect(url_for("report_daily", date=service_date))
+            elif current_topup != required_topup:
                 if required_topup == 0:
                     message = "施術分が5,000円以上です。登録済みの不足分を削除してから支払済みにしてください。"
                 elif current_topup == 0:
@@ -2117,13 +2158,6 @@ def create_app() -> Flask:
                 else:
                     message = f"不足分を現在必要な{required_topup:,}円にしてから支払済みにしてください。"
                 flash(message, "error")
-                return redirect(url_for("report_daily", date=service_date))
-            if paid_amount < DAILY_MINIMUM_PAYOUT_YEN:
-                missing_amount = DAILY_MINIMUM_PAYOUT_YEN - paid_amount
-                flash(
-                    f"支払合計が{paid_amount:,}円です。不足分{missing_amount:,}円を入力してから支払済みにしてください。",
-                    "error",
-                )
                 return redirect(url_for("report_daily", date=service_date))
             now = datetime.now().replace(microsecond=0).isoformat()
             conn.execute(
@@ -2136,7 +2170,13 @@ def create_app() -> Flask:
                 (service_date, therapist_id, paid_amount, now, method, notes),
             )
             conn.commit()
-            flash("支払い済みにしました。", "ok")
+            if is_below_minimum:
+                flash(
+                    f"例外（{exception_reason}）として、{paid_amount:,}円で支払い済みにしました。",
+                    "ok",
+                )
+            else:
+                flash("支払い済みにしました。", "ok")
             return redirect(url_for("report_daily", date=service_date))
         finally:
             conn.close()
@@ -2159,7 +2199,8 @@ def create_app() -> Flask:
             if below_minimum:
                 names = "、".join(str(s["therapist_name"]) for s in below_minimum)
                 flash(
-                    f"{names}の支払合計が5,000円未満です。不足分を入力してからまとめて支払済みにしてください。",
+                    f"{names}の支払合計が5,000円未満です。不足分を入力するか、"
+                    "個別に「例外：この金額で支払済」を選んでください。",
                     "error",
                 )
                 return redirect(url_for("report_daily", date=service_date))

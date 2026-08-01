@@ -1208,6 +1208,70 @@ body:not(.body--landing) .pill--ok{
   color:#126241;
 }
 
+.payoutStatus{
+  display:flex;
+  align-items:flex-start;
+  gap:6px;
+  flex-wrap:wrap;
+}
+
+.payoutStatus > .small{
+  flex-basis:100%;
+}
+
+.pill--warning{
+  border-color:#9a6817;
+  background:#fff6df;
+  color:#66430b;
+  font-size:14px;
+  font-weight:700;
+  white-space:normal;
+}
+
+.payoutAction{
+  justify-content:flex-end;
+  min-width:280px;
+}
+
+.payoutException{
+  flex:1 0 100%;
+  display:flex;
+  flex-direction:column;
+  gap:7px;
+  align-items:stretch;
+  margin-top:2px;
+  padding-top:9px;
+  border-top:1px solid #d7ad62;
+  text-align:left;
+}
+
+.payoutException__help{
+  margin:0;
+  color:#5c3d0b;
+  font-size:15px;
+  font-weight:700;
+  line-height:1.55;
+}
+
+.payoutException__label{
+  color:#35250c;
+  font-size:15px;
+  font-weight:700;
+}
+
+.payoutException__reason{
+  min-height:48px;
+  font-size:16px;
+}
+
+body:not(.body--landing) .btn.payoutException__button{
+  min-height:52px;
+  border-color:#9a6817;
+  background:#fff6df;
+  color:#5c3d0b;
+  white-space:normal;
+}
+
 .sr-only{
   position:absolute;
   width:1px;
