@@ -9,12 +9,21 @@
   <section class="card">
     <form class="form" method="post" action="{{ url_for('menus_edit_post', menu_id=menu.id) }}">
       <div class="form-row">
+        <label>ID</label>
+        <input name="display_id" type="number" inputmode="numeric" min="1" value="{{ menu.display_id }}" required />
+        <div class="help muted">同じIDを複数のメニューに設定できます。</div>
+      </div>
+      <div class="form-row">
         <label>メニュー名</label>
         <input name="name" value="{{ menu.name }}" required />
       </div>
       <div class="form-row">
         <label>単価（円）</label>
         <input name="price" type="number" inputmode="numeric" min="0" value="{{ menu.price }}" />
+      </div>
+      <div class="form-row">
+        <label>クーポン割引額（円）</label>
+        <input name="coupon_discount" type="number" inputmode="numeric" min="0" value="{{ menu.coupon_discount or 0 }}" />
       </div>
       <div class="form-row">
         <label>メニュー別歩合（任意）</label>

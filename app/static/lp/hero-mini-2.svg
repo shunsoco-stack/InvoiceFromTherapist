@@ -1,0 +1,23 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="360" height="240" viewBox="0 0 360 240" role="img" aria-label="Input illustration">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#281a27"/>
+      <stop offset="100%" stop-color="#6f3d56"/>
+    </linearGradient>
+    <radialGradient id="glow" cx="0.7" cy="0.2" r="0.8">
+      <stop offset="0%" stop-color="#f2c3d8" stop-opacity="0.55"/>
+      <stop offset="100%" stop-color="#f2c3d8" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+  <rect width="360" height="240" rx="28" fill="url(#bg)"/>
+  <rect width="360" height="240" rx="28" fill="url(#glow)"/>
+  <rect x="50" y="36" width="260" height="160" rx="22" fill="#1a141d" fill-opacity="0.78" stroke="#f2c3d8" stroke-opacity="0.4"/>
+  <rect x="78" y="62" width="90" height="16" rx="8" fill="#f2c3d8" fill-opacity="0.7"/>
+  <rect x="78" y="90" width="200" height="10" rx="5" fill="#ffffff" fill-opacity="0.2"/>
+  <rect x="78" y="112" width="180" height="10" rx="5" fill="#ffffff" fill-opacity="0.16"/>
+  <rect x="78" y="134" width="140" height="10" rx="5" fill="#ffffff" fill-opacity="0.12"/>
+  <circle cx="250" cy="150" r="24" fill="#f2c3d8" fill-opacity="0.25"/>
+  <path d="M242 138h16v24h-16z" fill="#f2c3d8" fill-opacity="0.65"/>
+  <path d="M236 150h28v6h-28z" fill="#f2c3d8" fill-opacity="0.65"/>
+  <path d="M206 182c18-12 36-16 54-10" fill="none" stroke="#ffffff" stroke-opacity="0.35" stroke-width="4" stroke-linecap="round"/>
+</svg>

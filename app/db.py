@@ -19,8 +19,10 @@ CREATE TABLE IF NOT EXISTS therapists (
 
 CREATE TABLE IF NOT EXISTS menus (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
+  display_id INTEGER,
   name TEXT NOT NULL,
   price INTEGER NOT NULL, -- yen
+  coupon_discount INTEGER NOT NULL DEFAULT 0, -- yen per treatment item
   commission_type TEXT,   -- nullable: fallback to therapist
   commission_value INTEGER,
   is_active INTEGER NOT NULL DEFAULT 1,
@@ -40,6 +42,7 @@ CREATE TABLE IF NOT EXISTS treatments (
   commission_type_override TEXT, -- nullable
   commission_value_override INTEGER,
   notes TEXT,
+  count_as_customer INTEGER NOT NULL DEFAULT 1, -- 0 = kiosk menu slot 2 (add-on), not counted as guest/customer
   created_at TEXT NOT NULL,
   FOREIGN KEY (therapist_id) REFERENCES therapists(id),
   FOREIGN KEY (menu_id) REFERENCES menus(id)
@@ -57,8 +60,35 @@ CREATE TABLE IF NOT EXISTS payouts (
   UNIQUE(service_date, therapist_id)
 );
 
+CREATE TABLE IF NOT EXISTS payout_topups (
+  service_date TEXT NOT NULL, -- YYYY-MM-DD
+  therapist_id INTEGER NOT NULL,
+  amount INTEGER NOT NULL CHECK(amount >= 0), -- yen, manually entered daily shortfall
+  updated_at TEXT NOT NULL,
+  PRIMARY KEY(service_date, therapist_id),
+  FOREIGN KEY (therapist_id) REFERENCES therapists(id)
+);
+
+CREATE TABLE IF NOT EXISTS supplies (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  name TEXT NOT NULL,
+  is_active INTEGER NOT NULL DEFAULT 1,
+  created_at TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS supply_alerts (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  supply_id INTEGER NOT NULL,
+  status TEXT NOT NULL DEFAULT 'open', -- open | ack
+  created_at TEXT NOT NULL,
+  acknowledged_at TEXT,
+  FOREIGN KEY (supply_id) REFERENCES supplies(id)
+);
+
 CREATE INDEX IF NOT EXISTS idx_treatments_date ON treatments(service_date);
 CREATE INDEX IF NOT EXISTS idx_treatments_therapist ON treatments(therapist_id);
+CREATE INDEX IF NOT EXISTS idx_payout_topups_date ON payout_topups(service_date);
+CREATE INDEX IF NOT EXISTS idx_supply_alerts_supply ON supply_alerts(supply_id);
 """
 
 
@@ -89,9 +119,33 @@ def init_db() -> None:
         _ensure_column(conn, table="treatments", column="hpb", col_def="INTEGER NOT NULL DEFAULT 0")
         _ensure_column(conn, table="treatments", column="p", col_def="INTEGER NOT NULL DEFAULT 0")
         _ensure_column(conn, table="treatments", column="r", col_def="INTEGER NOT NULL DEFAULT 0")
+        _ensure_count_as_customer_column(conn)
+        _ensure_menu_display_id_column(conn)
+        _ensure_column(conn, table="menus", column="coupon_discount", col_def="INTEGER NOT NULL DEFAULT 0")
         conn.commit()
     finally:
         conn.close()
+
+
+def _ensure_count_as_customer_column(conn: sqlite3.Connection) -> None:
+    cols = q(conn, "PRAGMA table_info(treatments)")
+    existing = {str(r["name"]) for r in cols}
+    if "count_as_customer" in existing:
+        return
+    conn.execute(
+        "ALTER TABLE treatments ADD COLUMN count_as_customer INTEGER NOT NULL DEFAULT 1",
+    )
+    conn.execute(
+        "UPDATE treatments SET count_as_customer = 1 WHERE count_as_customer IS NULL",
+    )
+
+
+def _ensure_menu_display_id_column(conn: sqlite3.Connection) -> None:
+    cols = q(conn, "PRAGMA table_info(menus)")
+    existing = {str(r["name"]) for r in cols}
+    if "display_id" not in existing:
+        conn.execute("ALTER TABLE menus ADD COLUMN display_id INTEGER")
+    conn.execute("UPDATE menus SET display_id = id WHERE display_id IS NULL")
 
 
 def _ensure_column(conn: sqlite3.Connection, table: str, column: str, col_def: str) -> None:
@@ -122,4 +176,3 @@ def exec1(conn: sqlite3.Connection, sql: str, args: Tuple[Any, ...] = ()) -> int
 
 def now_iso() -> str:
     return _utc_iso()
-

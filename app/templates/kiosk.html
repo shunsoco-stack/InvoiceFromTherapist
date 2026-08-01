@@ -1,14 +1,14 @@
 {% extends "base.html" %}
-{% set title = "簡単入力 / Simple" %}
+{% set title = "บันทึกงาน / 簡単入力" %}
 {% block content %}
   <div class="kiosk">
     <div class="kiosk__head">
-      <h1 class="kiosk__title">簡単入力 / Simple</h1>
-      <div class="kiosk__subtitle muted">Therapist input / สำหรับพนักงาน</div>
+      <h1 class="kiosk__title">บันทึกงาน / 簡単入力</h1>
+      <div class="kiosk__subtitle muted" lang="th">หน้าบันทึกสำหรับพนักงาน</div>
     </div>
 
     <section class="card kiosk__card">
-      <h2>日付 / Date / วันที่（固定）</h2>
+      <h2>วันที่บันทึก / 入力日（固定）</h2>
       <div class="kiosk__fixedDate mono">{{ service_date }}</div>
     </section>
 
@@ -23,10 +23,13 @@
       </section>
     {% else %}
       <section class="card kiosk__card">
-        <h2>日付 / วันที่</h2>
+        <h2>เปลี่ยนวันที่ / 日付変更</h2>
         <form class="inline" method="get" action="{{ url_for('kiosk') }}">
-          <input class="kiosk__dateInput" name="date" type="date" value="{{ service_date }}" />
-          <button class="btn btn--secondary kiosk__btn" type="submit">表示 / แสดง</button>
+          <button class="btn btn--secondary kiosk__btn" type="button" data-date-shift="-1">วันก่อน / 前日</button>
+          <label class="sr-only" for="kiosk-date">วันที่ / 日付</label>
+          <input id="kiosk-date" class="kiosk__dateInput" name="date" type="date" value="{{ service_date }}" data-auto-submit />
+          <button class="btn btn--secondary kiosk__btn" type="button" data-date-shift="1">วันถัดไป / 翌日</button>
+          <button class="btn btn--secondary kiosk__btn" type="submit">ดูวันที่นี้ / 表示</button>
           {% if selected_therapist_id %}
             <input type="hidden" name="therapist_id" value="{{ selected_therapist_id }}" />
           {% endif %}
@@ -34,85 +37,161 @@
       </section>
 
       <section id="input" class="card kiosk__card">
-        <h2>入力 / กรอก</h2>
+        <h2>กรอกข้อมูล / 入力</h2>
         <form class="kioskForm" method="post" action="{{ url_for('kiosk_new') }}">
           <input type="hidden" name="service_date" value="{{ service_date }}" />
           <div class="kioskRow">
-            <div class="kioskLabel">1) セラピスト / พนักงาน</div>
+            <label class="kioskLabel" for="therapistSelect">1) พนักงาน / セラピスト</label>
             <select id="therapistSelect" class="kioskSelect" name="therapist_id" required>
               <option value="" selected disabled>เลือกพนักงาน</option>
               {% for t in therapists %}
-                <option value="{{ t.id }}" {% if t.id == selected_therapist_id %}selected{% endif %}>{{ t.name }}</option>
+                <option value="{{ t.id }}"
+                        data-commission-type="{{ t.commission_type }}"
+                        data-commission-value="{{ t.commission_value }}"
+                        data-guarantee-amount="{{ guarantee_map.get(t.id, '') }}"
+                        {% if t.id == selected_therapist_id %}selected{% endif %}>
+                  {{ t.name }}
+                </option>
               {% endfor %}
             </select>
           </div>
 
+          <div id="guaranteeRow" class="kioskRow kioskRow--hidden" data-guarantee-lock="{{ '1' if guarantee_lock else '0' }}">
+            <label class="kioskLabel" for="guaranteeAmount">ค่าจ้างขั้นต่ำเมื่อลูกค้า 0 คน / 最低保証</label>
+            <div class="kioskGuarantee">
+              <input type="hidden" name="service_date" value="{{ service_date }}" form="kioskGuaranteeForm" />
+              <input type="hidden" name="therapist_id" id="guaranteeTherapistId" value="{{ selected_therapist_id }}" form="kioskGuaranteeForm" />
+              <input id="guaranteeAmount"
+                     name="guarantee_amount"
+                     class="kioskInput"
+                     type="number"
+                     inputmode="numeric"
+                     min="5000"
+                     placeholder="5000"
+                     value="{% if selected_payout and selected_payout.method == '最低保証' %}{{ selected_payout.paid_amount }}{% endif %}"
+                     form="kioskGuaranteeForm" />
+              <button class="btn btn--secondary kioskSmallBtn" type="submit" form="kioskGuaranteeForm">บันทึกค่าจ้างขั้นต่ำ / 最低保証を記録</button>
+            </div>
+            <div id="guaranteeStatus" class="kioskGuarantee__status" {% if not selected_payout or selected_payout.method != "最低保証" %}hidden{% endif %}>
+              <span class="pill pill--ok">บันทึกแล้ว / 登録済</span>
+              <span class="mono" id="guaranteeStatusAmount">
+                {% if selected_payout and selected_payout.method == "最低保証" %}
+                  {{ "{:,}".format(selected_payout.paid_amount) }}円
+                {% endif %}
+              </span>
+              <input type="hidden" name="service_date" value="{{ service_date }}" form="kioskGuaranteeDeleteForm" />
+              <input type="hidden" name="therapist_id" id="guaranteeDeleteTherapistId" value="{{ selected_therapist_id }}" form="kioskGuaranteeDeleteForm" />
+              <button class="btn btn--danger kioskSmallBtn" type="submit" form="kioskGuaranteeDeleteForm">ลบ / 削除</button>
+            </div>
+            <div id="guaranteeNote" class="kioskGuarantee__note muted small" hidden>
+              หากบันทึกค่าจ้างขั้นต่ำแล้ว จะเลือกเมนูไม่ได้ / 最低保証がある場合はメニュー選択できません。
+            </div>
+          </div>
+
           <div id="menuRow" class="kioskRow kioskRow--hidden">
-            <div class="kioskLabel">2) メニュー① / เมนู 1（T/60）</div>
+            <label class="kioskLabel" for="menuSelect1">2) เมนูหลัก / メニュー①（T/60）</label>
             <select id="menuSelect1" class="kioskSelect" name="menu_id_1" required disabled>
               <option value="" selected disabled>เลือกเมนู</option>
               {% for m in menus %}
-                <option value="{{ m.id }}">{{ m.name }}</option>
+                <option value="{{ m.id }}"
+                        data-price="{{ m.price }}"
+                        data-coupon-discount="{{ m.coupon_discount or 0 }}"
+                        data-commission-type="{{ m.commission_type or '' }}"
+                        data-commission-value="{{ m.commission_value if m.commission_value is not none else '' }}">
+                  {{ m.name }}
+                </option>
               {% endfor %}
             </select>
           </div>
 
           <div id="menuRow2" class="kioskRow kioskRow--hidden">
-            <div class="kioskLabel">3) メニュー②（任意） / เมนู 2 (ไม่บังคับ)</div>
+            <label class="kioskLabel" for="menuSelect2">3) เมนูเสริม（ไม่บังคับ）/ メニュー②（任意）</label>
             <select id="menuSelect2" class="kioskSelect" name="menu_id_2" disabled>
-              <option value="0" selected>なし / ไม่มี</option>
+              <option value="0" selected data-price="0" data-commission-type="" data-commission-value="">ไม่มี / なし</option>
               {% for m in menus %}
-                <option value="{{ m.id }}">{{ m.name }}</option>
+                <option value="{{ m.id }}"
+                        data-price="{{ m.price }}"
+                        data-coupon-discount="{{ m.coupon_discount or 0 }}"
+                        data-commission-type="{{ m.commission_type or '' }}"
+                        data-commission-value="{{ m.commission_value if m.commission_value is not none else '' }}">
+                  {{ m.name }}
+                </option>
               {% endfor %}
             </select>
           </div>
 
           <div id="actionsRow" class="actions kiosk__actions kioskRow--hidden">
+            <div class="kioskEstimate" id="kioskEstimate" aria-live="polite">
+              <div class="kioskEstimate__row">
+                <div class="kioskEstimate__cell">
+                  <span class="kioskEstimate__label">เมนูหลัก / メニュー①</span>
+                  <span class="kioskEstimate__value" id="estimateMenu1">-</span>
+                </div>
+                <div class="kioskEstimate__cell">
+                  <span class="kioskEstimate__label">ค่าจ้างพนักงาน / スタッフ</span>
+                  <span class="kioskEstimate__value" id="estimateStaff1">-</span>
+                </div>
+              </div>
+              <div class="kioskEstimate__row" id="estimateRow2" hidden>
+                <div class="kioskEstimate__cell">
+                  <span class="kioskEstimate__label">เมนูเสริม / メニュー②</span>
+                  <span class="kioskEstimate__value" id="estimateMenu2">-</span>
+                </div>
+                <div class="kioskEstimate__cell">
+                  <span class="kioskEstimate__label">ค่าจ้างพนักงาน / スタッフ</span>
+                  <span class="kioskEstimate__value" id="estimateStaff2">-</span>
+                </div>
+              </div>
+              <div class="kioskEstimate__note muted small">※HPB/P/Rも反映</div>
+            </div>
             <div class="kioskInlineFields">
               <div class="kioskInlineField">
-                <label class="kioskLabel" for="hpb">HPB（割引）/ ส่วนลด</label>
+                <label class="kioskLabel" for="hpb">ส่วนลด HPB / HPB（割引）</label>
                 <input id="hpb" name="hpb" class="kioskInput" type="number" inputmode="numeric" min="0" placeholder="0" />
               </div>
               <div class="kioskInlineField">
-                <label class="kioskLabel" for="p">P（ポイント）/ แต้ม</label>
+                <label class="kioskLabel" for="p">แต้มสะสม P / P（ポイント）</label>
                 <input id="p" name="p" class="kioskInput" type="number" inputmode="numeric" min="0" placeholder="0" />
               </div>
               <div class="kioskInlineField">
-                <label class="kioskLabel" for="r">R（指名料）/ ค่าตัว</label>
+                <label class="kioskLabel" for="r">ค่าเลือกพนักงาน R / R（指名料）</label>
                 <select id="r" name="r" class="kioskSelect kioskSelect--small" required>
-                  <option value="0" selected>なし / ไม่มี</option>
+                  <option value="0" selected>ไม่มี / なし</option>
                   <option value="500">500</option>
                   <option value="1000">1000</option>
                 </select>
               </div>
             </div>
-            <button class="btn kiosk__btn kiosk__btn--primary" type="submit">保存 / บันทึก</button>
-            <button class="btn btn--secondary kiosk__btn" type="submit" name="continue_add" value="1">保存して続ける / บันทึกต่อ</button>
+            <button class="btn kiosk__btn kiosk__btn--primary" type="submit">บันทึก / 保存</button>
+            <button class="btn btn--secondary kiosk__btn" type="submit" name="continue_add" value="1">บันทึกแล้วเพิ่มรายการต่อ / 保存して続ける</button>
           </div>
         </form>
+        <form id="kioskGuaranteeForm" method="post" action="{{ url_for('kiosk_guarantee') }}"></form>
+        <form id="kioskGuaranteeDeleteForm" method="post" action="{{ url_for('kiosk_guarantee_delete') }}"></form>
       </section>
 
       <section id="summary" class="card kiosk__card">
-        <h2>集計 / สรุป（{{ service_date }}）</h2>
+        <h2>สรุป / 集計（{{ service_date }}）</h2>
         {% if summaries|length == 0 %}
-          <div class="muted">まだ記録がありません。</div>
+          <div class="muted">ยังไม่มีรายการ / まだ記録がありません。</div>
         {% else %}
           <div class="kioskSheets">
             {% for s in summaries %}
               {% set items = items_by_therapist.get(s.therapist_id, []) %}
               {% set shop_share = (s.sales_total|int) - (s.payout_total|int) %}
+              {% set coupon_total = coupon_totals.get(s.therapist_id, 0) %}
               {% set hpb_total = hpb_totals.get(s.therapist_id, 0) %}
               {% set p_total = p_totals.get(s.therapist_id, 0) %}
               {% set r_total = r_totals.get(s.therapist_id, 0) %}
-              <div class="kioskSheet">
+              <div class="kioskSheet" id="summary-staff-{{ s.therapist_id }}">
                 <table class="kioskSheetTable">
                   <thead>
                     <tr>
-                      <th class="kioskSheetTh" colspan="2">スタッフ名 / พนักงาน　{{ s.therapist_name }}</th>
+                      <th class="kioskSheetTh" colspan="2">พนักงาน / スタッフ名　{{ s.therapist_name }}</th>
                     </tr>
                     <tr>
-                      <th class="kioskSheetTh">メニュー / เมนู</th>
-                      <th class="kioskSheetTh kioskSheetTh--right">金額 / ราคา</th>
+                      <th class="kioskSheetTh">เมนู / メニュー</th>
+                      <th class="kioskSheetTh kioskSheetTh--right">ราคา / 金額</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -128,33 +207,109 @@
                     {% endfor %}
                     {% if items|length == 0 %}
                       <tr>
-                        <td class="kioskSheetTd muted" colspan="2">（まだなし）</td>
+                        <td class="kioskSheetTd muted" colspan="2">
+                          {% if s.paid_method == "最低保証" %}
+                            ค่าจ้างขั้นต่ำ / 最低保証
+                          {% else %}
+                            （ยังไม่มี / まだなし）
+                          {% endif %}
+                        </td>
                       </tr>
                     {% endif %}
                   </tbody>
                   <tfoot>
                     <tr>
-                      <td class="kioskSheetTd">合計 / รวม</td>
+                      <td class="kioskSheetTd">จำนวนลูกค้า / 客数</td>
+                      <td class="kioskSheetTd kioskSheetTd--right mono strong">{{ s.customer_count }}</td>
+                    </tr>
+                    <tr>
+                      <td class="kioskSheetTd">ยอดขายรวม / 合計</td>
                       <td class="kioskSheetTd kioskSheetTd--right mono">{{ "{:,}".format(s.sales_total) }}</td>
                     </tr>
                     <tr>
-                      <td class="kioskSheetTd">スタッフ / พนักงาน</td>
-                      <td class="kioskSheetTd kioskSheetTd--right mono strong">{{ "{:,}".format(s.payout_total) }}</td>
+                      <td class="kioskSheetTd">ค่าจ้างจากงาน / 施術分</td>
+                      <td class="kioskSheetTd kioskSheetTd--right mono">{{ "{:,}".format(s.base_payout_total) }}</td>
                     </tr>
                     <tr>
-                      <td class="kioskSheetTd">店舗 / ร้าน</td>
+                      <td class="kioskSheetTd">
+                        {% if s.is_legacy_guarantee %}ค่าจ้างขั้นต่ำ / 最低保証{% else %}เงินเพิ่ม / 不足分{% endif %}
+                      </td>
+                      <td class="kioskSheetTd kioskSheetTd--right mono">{{ "{:,}".format(s.topup_amount) }}</td>
+                    </tr>
+                    <tr>
+                      <td class="kioskSheetTd strong">รับทั้งหมด / 支払合計</td>
+                      <td class="kioskSheetTd kioskSheetTd--right mono strong">{{ "{:,}".format(s.payout_total) }}</td>
+                    </tr>
+                    {% if not s.is_legacy_guarantee and (s.shortfall_to_minimum|int > 0 or s.topup_amount|int > 0) %}
+                      <tr>
+                        <td class="kioskSheetTd" colspan="2">
+                          <div class="kioskAdjustment">
+                            <div class="kioskAdjustment__title">เงินเพิ่มให้ครบ 5,000 เยน / 5,000円までの不足分</div>
+                            <div class="kioskAdjustment__help muted" id="topup-help-{{ s.therapist_id }}">
+                              ใส่เฉพาะจำนวนเงินที่ขาด / 足りない金額だけ入力
+                              {% if s.payout_total|int == 5000 %}
+                                （ครบ 5,000 เยนแล้ว / 5,000円になっています）
+                              {% elif s.topup_amount|int > s.shortfall_to_minimum|int %}
+                                （เงินเพิ่มสูงเกินไป สูงสุด {{ "{:,}".format(s.shortfall_to_minimum) }} เยน / 不足分は最大{{ "{:,}".format(s.shortfall_to_minimum) }}円）
+                              {% else %}
+                                （ใส่ {{ "{:,}".format(s.shortfall_to_minimum) }} เยน เพื่อให้ครบ / 入力する不足分：{{ "{:,}".format(s.shortfall_to_minimum) }}円）
+                              {% endif %}
+                            </div>
+                            <div class="kioskAdjustment__controls">
+                              <form class="kioskAdjustment__form" method="post" action="{{ url_for('kiosk_payout_topup') }}">
+                                <input type="hidden" name="service_date" value="{{ service_date }}" />
+                                <input type="hidden" name="therapist_id" value="{{ s.therapist_id }}" />
+                                <label class="sr-only" for="topup-amount-{{ s.therapist_id }}">เงินเพิ่ม (เยน) / 不足分（円）</label>
+                                <input id="topup-amount-{{ s.therapist_id }}"
+                                       class="kioskInput kioskAdjustment__input"
+                                       name="topup_amount"
+                                       type="number"
+                                       inputmode="numeric"
+                                       min="1"
+                                       step="1"
+                                       value="{{ s.topup_amount if s.topup_amount else s.shortfall_to_minimum }}"
+                                       aria-describedby="topup-help-{{ s.therapist_id }}"
+                                       required
+                                       {% if s.paid %}disabled{% endif %} />
+                                <button class="btn btn--secondary kioskSmallBtn" type="submit" {% if s.paid %}disabled{% endif %}>
+                                  บันทึกเงินเพิ่ม / 不足分を保存
+                                </button>
+                              </form>
+                              {% if s.topup_amount|int > 0 %}
+                                <form method="post" action="{{ url_for('kiosk_payout_topup_delete') }}" onsubmit="return confirm('ต้องการลบเงินเพิ่มหรือไม่？ / 不足分を削除しますか？');">
+                                  <input type="hidden" name="service_date" value="{{ service_date }}" />
+                                  <input type="hidden" name="therapist_id" value="{{ s.therapist_id }}" />
+                                  <button class="btn btn--danger kioskSmallBtn" type="submit" {% if s.paid %}disabled{% endif %}>
+                                    ลบเงินเพิ่ม / 不足分を削除
+                                  </button>
+                                </form>
+                              {% endif %}
+                            </div>
+                            {% if s.paid %}
+                              <div class="kioskAdjustment__help muted">ชำระเงินแล้ว หากต้องการแก้ไขให้ยกเลิกการชำระก่อน / 支払済みのため、変更する場合は先に支払取消してください。</div>
+                            {% endif %}
+                          </div>
+                        </td>
+                      </tr>
+                    {% endif %}
+                    <tr>
+                      <td class="kioskSheetTd">ส่วนของร้าน / 店舗</td>
                       <td class="kioskSheetTd kioskSheetTd--right mono">{{ "{:,}".format(shop_share) }}</td>
                     </tr>
                     <tr>
-                      <td class="kioskSheetTd">HPB（割引）/ ส่วนลด</td>
+                      <td class="kioskSheetTd">ส่วนลด HPB / HPB（割引）</td>
                       <td class="kioskSheetTd kioskSheetTd--right mono">{{ "{:,}".format(hpb_total) }}</td>
                     </tr>
                     <tr>
-                      <td class="kioskSheetTd">P（ポイント）/ แต้ม</td>
+                      <td class="kioskSheetTd">ส่วนลดคูปอง / クーポン割引</td>
+                      <td class="kioskSheetTd kioskSheetTd--right mono">{{ "{:,}".format(coupon_total) }}</td>
+                    </tr>
+                    <tr>
+                      <td class="kioskSheetTd">แต้มสะสม P / P（ポイント）</td>
                       <td class="kioskSheetTd kioskSheetTd--right mono">{{ "{:,}".format(p_total) }}</td>
                     </tr>
                     <tr>
-                      <td class="kioskSheetTd">R（指名料）/ ค่าตัว</td>
+                      <td class="kioskSheetTd">ค่าเลือกพนักงาน R / R（指名料）</td>
                       <td class="kioskSheetTd kioskSheetTd--right mono">{{ "{:,}".format(r_total) }}</td>
                     </tr>
                   </tfoot>
@@ -166,19 +321,19 @@
       </section>
 
       <section id="history" class="card kiosk__card">
-        <h2>履歴（修正/削除）/ ประวัติ（แก้ไข/ลบ）</h2>
-        <p class="muted">入力ミスを直したい時はここからできます。 / แก้ไขได้ที่นี่</p>
-        <div class="table-wrap">
+        <h2>ประวัติ（แก้ไข/ลบ）/ 履歴（修正/削除）</h2>
+        <p class="muted">หากกรอกผิด แก้ไขได้ที่นี่ / 入力ミスを直したい時はここからできます。</p>
+        <div class="table-wrap" tabindex="0" role="region" aria-label="ประวัติรายการ / 入力履歴">
           <table class="table">
             <thead>
               <tr>
-                <th>ID</th>
-                <th>セラピスト / พนักงาน</th>
-                <th>メニュー / เมนู</th>
-                <th class="right">HPB</th>
-                <th class="right">P</th>
-                <th class="right">R</th>
-                <th></th>
+                <th scope="col">ID</th>
+                <th scope="col">พนักงาน / セラピスト</th>
+                <th scope="col">เมนู / メニュー</th>
+                <th scope="col" class="right">HPB</th>
+                <th scope="col" class="right">P</th>
+                <th scope="col" class="right">R</th>
+                <th scope="col"><span class="sr-only">操作</span></th>
               </tr>
             </thead>
             <tbody>
@@ -192,17 +347,17 @@
                   <td class="right mono">{{ r.r }}</td>
                   <td class="right">
                     <div class="actions" style="justify-content:flex-end; margin:0;">
-                      <a class="btn btn--secondary kioskSmallBtn" href="{{ url_for('kiosk_edit', treatment_id=r.id, date=service_date) }}">修正 / แก้ไข</a>
-                      <form method="post" action="{{ url_for('kiosk_delete', treatment_id=r.id) }}" onsubmit="return confirm('削除しますか？');">
+                      <a class="btn btn--secondary kioskSmallBtn" href="{{ url_for('kiosk_edit', treatment_id=r.id, date=service_date) }}">แก้ไข / 修正</a>
+                      <form method="post" action="{{ url_for('kiosk_delete', treatment_id=r.id) }}" onsubmit="return confirm('ต้องการลบรายการนี้หรือไม่？ / 削除しますか？');">
                         <input type="hidden" name="return_date" value="{{ service_date }}" />
-                        <button class="btn btn--danger kioskSmallBtn" type="submit">削除 / ลบ</button>
+                        <button class="btn btn--danger kioskSmallBtn" type="submit">ลบ / 削除</button>
                       </form>
                     </div>
                   </td>
                 </tr>
               {% endfor %}
               {% if recent|length == 0 %}
-                <tr><td colspan="7" class="muted">まだ入力がありません。 / ยังไม่มีรายการ</td></tr>
+                <tr><td colspan="7" class="muted">ยังไม่มีรายการ / まだ入力がありません。</td></tr>
               {% endif %}
             </tbody>
           </table>
@@ -210,24 +365,216 @@
       </section>
 
       <section class="card kiosk__card">
-        <h2>ヘルプ / ช่วยเหลือ</h2>
+        <h2>วิธีใช้ / ヘルプ</h2>
         <ul class="list">
-          <li>押す順番 / ลำดับ: <b>セラピスト → メニュー① → （メニュー②） → 保存</b></li>
-          <li>間違えたら「今日の履歴」から修正/削除できます。</li>
+          <li lang="th"><b>ลำดับการกด:</b> พนักงาน → เมนูหลัก →（เมนูเสริม）→ บันทึก</li>
+          <li lang="th">เมนูเสริมรวมในยอดขายและค่าจ้าง แต่ไม่นับลูกค้าเพิ่ม</li>
+          <li lang="th">ถ้าค่าจ้างยังไม่ถึง 5,000 เยน ให้ใส่เฉพาะเงินที่ขาดในช่อง “เงินเพิ่ม”</li>
+          <li lang="th">ถ้ากรอกผิด ให้แก้ไขหรือลบในประวัติของวันที่เลือก</li>
         </ul>
       </section>
 
       <script>
         const therapistSelect = document.getElementById('therapistSelect');
         const menuRow = document.getElementById('menuRow');
+        const guaranteeRow = document.getElementById('guaranteeRow');
+        const guaranteeTherapistId = document.getElementById('guaranteeTherapistId');
+        const guaranteeAmount = document.getElementById('guaranteeAmount');
+        const guaranteeNote = document.getElementById('guaranteeNote');
+        const guaranteeStatus = document.getElementById('guaranteeStatus');
+        const guaranteeStatusAmount = document.getElementById('guaranteeStatusAmount');
+        const guaranteeDeleteTherapistId = document.getElementById('guaranteeDeleteTherapistId');
         const menuRow2 = document.getElementById('menuRow2');
         const menuSelect1 = document.getElementById('menuSelect1');
         const menuSelect2 = document.getElementById('menuSelect2');
         const actionsRow = document.getElementById('actionsRow');
+        const hpbInput = document.getElementById('hpb');
+        const pInput = document.getElementById('p');
+        const rSelect = document.getElementById('r');
+        const estimateMenu1 = document.getElementById('estimateMenu1');
+        const estimateStaff1 = document.getElementById('estimateStaff1');
+        const estimateMenu2 = document.getElementById('estimateMenu2');
+        const estimateStaff2 = document.getElementById('estimateStaff2');
+        const estimateRow2 = document.getElementById('estimateRow2');
+
+        function formatYen(value) {
+          return `${value.toLocaleString()}円`;
+        }
+
+        function readNumber(value) {
+          const parsed = Number(value);
+          return Number.isFinite(parsed) ? parsed : 0;
+        }
+
+        function pickRule(menuType, menuValue, therapistType, therapistValue) {
+          if (menuType && menuValue !== null) {
+            return { type: menuType, value: menuValue };
+          }
+          if (therapistType && therapistValue !== null) {
+            return { type: therapistType, value: therapistValue };
+          }
+          return { type: 'percent', value: 50 };
+        }
+
+        function calcTreatment(price, rule, hpb, p, r) {
+          const gross = Math.max(0, Math.trunc(price));
+          const discount = Math.max(0, Math.trunc(hpb)) + Math.max(0, Math.trunc(p));
+          const net = Math.max(0, gross - discount);
+          let staffMenu = 0;
+          if (rule.type === 'fixed') {
+            staffMenu = Math.max(0, Math.trunc(rule.value));
+          } else {
+            const pct = Math.max(0, Math.min(100, Math.trunc(rule.value)));
+            staffMenu = Math.floor((net * pct) / 100);
+          }
+          const rFee = Math.max(0, Math.trunc(r));
+          return {
+            sales: net + rFee,
+            staff: staffMenu + rFee,
+          };
+        }
+
+        function getTherapistRule() {
+          const opt = therapistSelect.selectedOptions[0];
+          if (!opt) {
+            return null;
+          }
+          const type = opt.dataset.commissionType || '';
+          const value = opt.dataset.commissionValue === '' ? null : readNumber(opt.dataset.commissionValue);
+          return { type, value };
+        }
+
+        function getMenuData(select) {
+          if (!select || !select.value || select.value === '0') {
+            return null;
+          }
+          const opt = select.selectedOptions[0];
+          if (!opt) {
+            return null;
+          }
+          return {
+            price: readNumber(opt.dataset.price),
+            couponDiscount: readNumber(opt.dataset.couponDiscount),
+            commissionType: opt.dataset.commissionType || '',
+            commissionValue: opt.dataset.commissionValue === '' ? null : readNumber(opt.dataset.commissionValue),
+          };
+        }
+
+        function resetEstimate() {
+          const placeholders = ['-', '-', '-', '-'];
+          [estimateMenu1, estimateStaff1, estimateMenu2, estimateStaff2].forEach((el, idx) => {
+            if (el) {
+              el.textContent = placeholders[idx];
+            }
+          });
+          if (estimateRow2) {
+            estimateRow2.hidden = true;
+          }
+        }
+
+        function syncCouponDiscountToHpb() {
+          if (!hpbInput) {
+            return;
+          }
+          const menu1 = getMenuData(menuSelect1);
+          const menu2 = getMenuData(menuSelect2);
+          const couponTotal = Math.max(0, Math.trunc(menu1?.couponDiscount || 0)) +
+                              Math.max(0, Math.trunc(menu2?.couponDiscount || 0));
+          hpbInput.value = couponTotal > 0 ? String(couponTotal) : '';
+        }
+
+        function updateEstimate() {
+          if (!estimateMenu1) {
+            return;
+          }
+          const therapistRule = getTherapistRule();
+          const menu1 = getMenuData(menuSelect1);
+          if (!therapistRule || !menu1) {
+            resetEstimate();
+            return;
+          }
+
+          const hpb = readNumber(hpbInput?.value);
+          const p = readNumber(pInput?.value);
+          const r = readNumber(rSelect?.value);
+          const rule1 = pickRule(menu1.commissionType, menu1.commissionValue, therapistRule.type, therapistRule.value);
+          const result1 = calcTreatment(menu1.price, rule1, hpb, p, r);
+
+          let result2 = null;
+          const menu2 = getMenuData(menuSelect2);
+          if (menu2) {
+            const rule2 = pickRule(menu2.commissionType, menu2.commissionValue, therapistRule.type, therapistRule.value);
+            result2 = calcTreatment(menu2.price, rule2, 0, 0, 0);
+          }
+
+          estimateMenu1.textContent = formatYen(result1.sales);
+          estimateStaff1.textContent = formatYen(result1.staff);
+          if (result2) {
+            estimateMenu2.textContent = formatYen(result2.sales);
+            estimateStaff2.textContent = formatYen(result2.staff);
+            if (estimateRow2) {
+              estimateRow2.hidden = false;
+            }
+          } else {
+            estimateMenu2.textContent = '-';
+            estimateStaff2.textContent = '-';
+            if (estimateRow2) {
+              estimateRow2.hidden = true;
+            }
+          }
+        }
+
+        function syncGuaranteeState() {
+          const opt = therapistSelect.selectedOptions[0];
+          const amountRaw = opt?.dataset.guaranteeAmount || '';
+          const hasGuarantee = amountRaw !== '';
+          if (guaranteeAmount) {
+            guaranteeAmount.value = hasGuarantee ? amountRaw : '';
+          }
+          if (guaranteeRow) {
+            guaranteeRow.dataset.guaranteeLock = hasGuarantee ? '1' : '0';
+          }
+          if (guaranteeStatus) {
+            guaranteeStatus.hidden = !hasGuarantee;
+          }
+          if (guaranteeStatusAmount && hasGuarantee) {
+            const amt = Number(amountRaw);
+            guaranteeStatusAmount.textContent = Number.isFinite(amt) ? `${amt.toLocaleString()}円` : '';
+          }
+          if (guaranteeDeleteTherapistId) {
+            guaranteeDeleteTherapistId.value = therapistSelect.value;
+          }
+          applyGuaranteeLock();
+        }
+
+        function applyGuaranteeLock() {
+          const registered = guaranteeRow?.dataset.guaranteeLock === '1';
+          const amount = readNumber(guaranteeAmount?.value);
+          const locked = registered || amount > 0;
+          if (locked) {
+            menuRow.classList.add('kioskRow--hidden');
+            menuSelect1.disabled = true;
+            menuRow2.classList.add('kioskRow--hidden');
+            menuSelect2.disabled = true;
+            actionsRow.classList.add('kioskRow--hidden');
+            resetEstimate();
+          } else if (therapistSelect.value) {
+            showMenuStep();
+          }
+          if (guaranteeNote) {
+            guaranteeNote.hidden = !locked;
+          }
+        }
 
         function showMenuStep() {
           menuRow.classList.remove('kioskRow--hidden');
           menuSelect1.disabled = false;
+        }
+
+        function showGuaranteeRow() {
+          if (guaranteeRow) {
+            guaranteeRow.classList.remove('kioskRow--hidden');
+          }
         }
 
         function showMenu2AndActions() {
@@ -238,6 +585,10 @@
 
         therapistSelect.addEventListener('change', () => {
           if (therapistSelect.value) {
+            showGuaranteeRow();
+            if (guaranteeTherapistId) {
+              guaranteeTherapistId.value = therapistSelect.value;
+            }
             showMenuStep();
             // reset menu/actions for next input
             menuSelect1.value = "";
@@ -245,21 +596,47 @@
             menuRow2.classList.add('kioskRow--hidden');
             menuSelect2.disabled = true;
             actionsRow.classList.add('kioskRow--hidden');
+            resetEstimate();
+            syncGuaranteeState();
           }
         });
 
         menuSelect1.addEventListener('change', () => {
           if (menuSelect1.value) {
             showMenu2AndActions();
+            syncCouponDiscountToHpb();
+            updateEstimate();
           }
         });
 
+        menuSelect2.addEventListener('change', () => {
+          syncCouponDiscountToHpb();
+          updateEstimate();
+        });
+
+        if (hpbInput) {
+          hpbInput.addEventListener('input', updateEstimate);
+        }
+        if (pInput) {
+          pInput.addEventListener('input', updateEstimate);
+        }
+        if (rSelect) {
+          rSelect.addEventListener('change', updateEstimate);
+        }
+        if (guaranteeAmount) {
+          guaranteeAmount.addEventListener('input', applyGuaranteeLock);
+        }
+
         // If therapist is preselected (after "save and continue"), open the next step automatically.
         if (therapistSelect.value) {
+          showGuaranteeRow();
+          if (guaranteeTherapistId) {
+            guaranteeTherapistId.value = therapistSelect.value;
+          }
           showMenuStep();
+          syncGuaranteeState();
         }
       </script>
     {% endif %}
   </div>
 {% endblock %}
-

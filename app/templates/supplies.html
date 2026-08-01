@@ -1,52 +1,12 @@
 {% extends "base.html" %}
-{% set title = "管理" %}
+{% set title = "備品" %}
 {% block content %}
   <div class="page-head">
-    <h1>管理 / จัดการ</h1>
-    <p class="muted">レポート確認・登録・修正はこちら。 / รายงาน・เพิ่มข้อมูล・แก้ไข</p>
+    <h1>備品 / ของใช้</h1>
+    <p class="muted">不足しそうな備品を通知できます。</p>
   </div>
 
   <section class="card">
-    <h2>今日（{{ today }}）</h2>
-    <div class="actions">
-      <a class="btn" href="{{ url_for('report_daily', date=today) }}">日次レポート / รายงาน</a>
-      <a class="btn btn--secondary" href="{{ url_for('report_monthly', month=today[:7]) }}">月次カレンダー</a>
-      <a class="btn btn--secondary" href="{{ url_for('treatments_list', date=today) }}">施術入力（詳細）/ รายการ</a>
-    </div>
-  </section>
-
-  <section class="card">
-    <h2>登録</h2>
-    <div class="actions">
-      <a class="btn btn--secondary" href="{{ url_for('therapists_list') }}">セラピスト / พนักงาน</a>
-      <a class="btn btn--secondary" href="{{ url_for('menus_list') }}">メニュー / เมนู</a>
-    </div>
-  </section>
-
-  <section class="card">
-    <h2>CSV出力</h2>
-    <p class="muted">支払済みの記録からCSVを出力します。</p>
-    <div class="actions">
-      <a class="btn" href="{{ url_for('report_payouts_csv') }}">支払CSV / การจ่าย</a>
-      <a class="btn" href="{{ url_for('report_staff') }}">スタッフ別レポート・CSV出力</a>
-    </div>
-
-    <h3 style="margin-top:16px;">Salesops_v3 連携用：日別売上CSV</h3>
-    <p class="muted">指定期間の「発生日／売上／客数／HPB割引合計／P割引合計」を日別集計でCSV出力します（UTF-8 BOM付き・日付はYYYY-MM-DD / Salesops_v3 のCSV取込でそのまま取り込めます）。</p>
-    <form class="inline" method="get" action="{{ url_for('report_sales_daily_csv') }}">
-      <label>開始日 <input name="date_from" type="date" value="{{ today[:8] }}01" /></label>
-      <label>終了日 <input name="date_to" type="date" value="{{ today }}" /></label>
-      <button class="btn" type="submit">日別売上CSVを出力</button>
-    </form>
-    <form class="inline" method="post" action="{{ url_for('report_sales_daily_missing_csv') }}" enctype="multipart/form-data" style="margin-top:10px;">
-      <label>開始日 <input name="date_from" type="date" value="{{ today[:8] }}01" /></label>
-      <label>終了日 <input name="date_to" type="date" value="{{ today }}" /></label>
-      <label>既存CSV・カード取引CSV <input name="existing_csv" type="file" accept=".csv,text/csv" required /></label>
-      <button class="btn btn--secondary" type="submit">未登録日だけCSV出力</button>
-    </form>
-  </section>
-
-  <section id="supplies" class="card">
     <h2>備品アラート</h2>
     {% if supply_alerts|length == 0 %}
       <p class="muted">未対応のお知らせはありません。</p>
@@ -129,5 +89,12 @@
         </table>
       </div>
     {% endif %}
+  </section>
+
+  <section class="card">
+    <div class="actions">
+      <a class="btn btn--secondary" href="{{ url_for('index') }}">トップへ戻る / กลับ</a>
+      <a class="btn btn--secondary" href="{{ url_for('admin') }}">管理へ / จัดการ</a>
+    </div>
   </section>
 {% endblock %}

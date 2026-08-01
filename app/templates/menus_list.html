@@ -10,12 +10,21 @@
     <h2>追加</h2>
     <form class="form" method="post" action="{{ url_for('menus_new') }}">
       <div class="form-row">
+        <label>ID（任意）</label>
+        <input name="display_id" type="number" inputmode="numeric" min="1" placeholder="空欄なら自動" />
+        <div class="help muted">任意の番号を指定できます。空欄の場合は自動採番です。</div>
+      </div>
+      <div class="form-row">
         <label>メニュー名</label>
         <input name="name" placeholder="例）T/60" required />
       </div>
       <div class="form-row">
         <label>単価（円）</label>
         <input name="price" type="number" inputmode="numeric" value="6000" />
+      </div>
+      <div class="form-row">
+        <label>クーポン割引額（円）</label>
+        <input name="coupon_discount" type="number" inputmode="numeric" min="0" value="0" />
       </div>
       <div class="form-row">
         <label>メニュー別歩合（任意）</label>
@@ -41,6 +50,10 @@
 
   <section class="card">
     <h2>一覧</h2>
+    <div class="actions">
+      <a class="btn {% if order != 'asc' %}btn--secondary{% endif %}" href="{{ url_for('menus_list', order='asc') }}">ID昇順</a>
+      <a class="btn {% if order != 'desc' %}btn--secondary{% endif %}" href="{{ url_for('menus_list', order='desc') }}">ID降順</a>
+    </div>
     <div class="table-wrap">
       <table class="table">
         <thead>
@@ -48,6 +61,7 @@
             <th>ID</th>
             <th>メニュー</th>
             <th>単価</th>
+            <th>クーポン割引</th>
             <th>メニュー別歩合</th>
             <th>状態</th>
             <th></th>
@@ -56,9 +70,10 @@
         <tbody>
           {% for m in menus %}
             <tr>
-              <td class="mono">{{ m.id }}</td>
+              <td class="mono">{{ m.display_id }}</td>
               <td>{{ m.name }}</td>
               <td class="mono">{{ "{:,}".format(m.price) }}円</td>
+              <td class="mono">{{ "{:,}".format(m.coupon_discount or 0) }}円</td>
               <td class="mono">
                 {% if m.commission_type %}
                   {% if m.commission_type == "percent" %}
@@ -90,7 +105,7 @@
             </tr>
           {% endfor %}
           {% if menus|length == 0 %}
-            <tr><td colspan="6" class="muted">まだ登録がありません。</td></tr>
+            <tr><td colspan="7" class="muted">まだ登録がありません。</td></tr>
           {% endif %}
         </tbody>
       </table>

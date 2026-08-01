@@ -4,9 +4,11 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width,initial-scale=1" />
     <title>{{ title or "サロン日報" }}</title>
+    <link rel="icon" href="{{ url_for('static', filename='icon.svg') }}" type="image/svg+xml" />
+    <link rel="apple-touch-icon" href="{{ url_for('static', filename='icon.svg') }}" />
     <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}" />
   </head>
-  <body>
+  <body class="{{ body_class or '' }}">
     <header class="header">
       <div class="container header__inner">
         <div class="brand">
@@ -20,7 +22,8 @@
         {% if messages %}
           <div class="flash">
             {% for category, message in messages %}
-              <div class="flash__item flash__item--{{ category }}">{{ message }}</div>
+              <div class="flash__item flash__item--{{ category }}"
+                   role="{{ 'alert' if category == 'error' else 'status' }}">{{ message }}</div>
             {% endfor %}
           </div>
         {% endif %}
@@ -34,6 +37,69 @@
         <span class="muted">ローカル用の簡易システム（SQLite）</span>
       </div>
     </footer>
+    <script>
+      (() => {
+        const autoInputs = document.querySelectorAll("[data-auto-submit]");
+        autoInputs.forEach((input) => {
+          input.addEventListener("change", () => {
+            const form = input.closest("form");
+            if (!form) {
+              return;
+            }
+            if (form.requestSubmit) {
+              form.requestSubmit();
+            } else {
+              form.submit();
+            }
+          });
+        });
+
+        const formatDate = (date) => {
+          const yyyy = date.getFullYear();
+          const mm = String(date.getMonth() + 1).padStart(2, "0");
+          const dd = String(date.getDate()).padStart(2, "0");
+          return `${yyyy}-${mm}-${dd}`;
+        };
+
+        const parseDateValue = (value) => {
+          const parts = value.split("-").map((v) => Number(v));
+          if (parts.length !== 3 || parts.some((v) => Number.isNaN(v))) {
+            return null;
+          }
+          const [year, month, day] = parts;
+          return new Date(year, month - 1, day);
+        };
+
+        const shiftButtons = document.querySelectorAll("[data-date-shift]");
+        shiftButtons.forEach((button) => {
+          button.addEventListener("click", () => {
+            const form = button.closest("form");
+            if (!form) {
+              return;
+            }
+            const input = form.querySelector('input[type="date"]');
+            if (!input) {
+              return;
+            }
+            const shift = Number(button.dataset.dateShift || "0");
+            if (Number.isNaN(shift) || shift === 0) {
+              return;
+            }
+            const baseDate = input.value ? parseDateValue(input.value) : new Date();
+            if (!baseDate) {
+              return;
+            }
+            baseDate.setDate(baseDate.getDate() + shift);
+            input.value = formatDate(baseDate);
+            if (form.requestSubmit) {
+              form.requestSubmit();
+            } else {
+              form.submit();
+            }
+          });
+        });
+      })();
+    </script>
   </body>
 </html>
 

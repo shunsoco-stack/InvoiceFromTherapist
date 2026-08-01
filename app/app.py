@@ -1,6 +1,6 @@
 import csv
 import io
-from datetime import date, datetime
+from datetime import date, datetime, timedelta, timezone
 from typing import Dict, List, Optional, Tuple
 
 import os
@@ -8,24 +8,113 @@ import os
 from flask import Flask, Response, flash, redirect, render_template, request, url_for
 
 from app.calc import calc_payout_yen, calc_treatment_yen, pick_commission_rule
+from app.csv_import import extract_existing_sales_dates
 from app.db import connect, exec1, init_db, now_iso, q, q1
 
 
+DAILY_MINIMUM_PAYOUT_YEN = 5000
+MINIMUM_PAYOUT_EXCEPTION_NOTE_PREFIX = "最低保証対象外"
+
+
 def create_app() -> Flask:
-    app = Flask(__name__)
+    app = Flask(
+        __name__,
+        static_url_path="/static",
+        static_folder="static",
+        template_folder="templates",
+    )
     app.secret_key = os.getenv("SALON_SECRET_KEY", "dev-secret-key")  # ローカル運用想定
 
     init_db()
 
+    def _delete_topup_if_no_treatments(conn, service_date: str, therapist_id: int) -> None:
+        row = q1(
+            conn,
+            "SELECT COUNT(*) AS cnt FROM treatments WHERE service_date = ? AND therapist_id = ?",
+            (service_date, therapist_id),
+        )
+        if row and int(row["cnt"]) == 0:
+            conn.execute(
+                "DELETE FROM payout_topups WHERE service_date = ? AND therapist_id = ?",
+                (service_date, therapist_id),
+            )
+
+    def _payout_exists(conn, service_date: str, therapist_id: int) -> bool:
+        return q1(
+            conn,
+            "SELECT id FROM payouts WHERE service_date = ? AND therapist_id = ?",
+            (service_date, therapist_id),
+        ) is not None
+
+    def _find_logo_filename() -> Optional[str]:
+        static_dir = app.static_folder or ""
+        env_filename = (os.getenv("SALON_LOGO_FILENAME") or "").strip()
+        candidates = []
+        if env_filename:
+            candidates.append(env_filename)
+        candidates.extend(["logo.svg", "logo.png", "logo.webp", "logo.jpg", "logo.jpeg"])
+        for name in candidates:
+            if not name:
+                continue
+            if os.path.exists(os.path.join(static_dir, name)):
+                return name
+        return None
+
     @app.get("/")
     def index():
         today = date.today().isoformat()
-        return render_template("index.html", today=today)
+        conn = connect()
+        try:
+            row = q1(conn, "SELECT COUNT(*) AS cnt FROM supply_alerts WHERE status = 'open'")
+            supply_alerts_count = int(row["cnt"]) if row else 0
+        finally:
+            conn.close()
+        logo_filename = _find_logo_filename()
+        logo_url = url_for("static", filename=logo_filename) if logo_filename else None
+        logo_alt = (os.getenv("SALON_LOGO_ALT") or "ロゴ").strip() or "ロゴ"
+        return render_template(
+            "index.html",
+            today=today,
+            logo_url=logo_url,
+            logo_alt=logo_alt,
+            supply_alerts_count=supply_alerts_count,
+        )
+
+    @app.get("/lp")
+    @app.get("/landing")
+    def landing():
+        logo_filename = _find_logo_filename()
+        logo_url = url_for("static", filename=logo_filename) if logo_filename else None
+        logo_alt = (os.getenv("SALON_LOGO_ALT") or "ロゴ").strip() or "ロゴ"
+        return render_template("landing.html", logo_url=logo_url, logo_alt=logo_alt)
 
     @app.get("/admin")
     def admin():
         today = date.today().isoformat()
-        return render_template("admin.html", today=today)
+        conn = connect()
+        try:
+            supplies, supply_alerts = _load_supply_context(conn)
+            return render_template(
+                "admin.html",
+                today=today,
+                supplies=supplies,
+                supply_alerts=supply_alerts,
+            )
+        finally:
+            conn.close()
+
+    @app.get("/supplies")
+    def supplies_page():
+        conn = connect()
+        try:
+            supplies, supply_alerts = _load_supply_context(conn)
+            return render_template(
+                "supplies.html",
+                supplies=supplies,
+                supply_alerts=supply_alerts,
+            )
+        finally:
+            conn.close()
 
     # ----------------
     # Kiosk (simple input for therapists)
@@ -40,10 +129,33 @@ def create_app() -> Flask:
             therapists, menus = _load_active_therapists_and_menus(conn)
             summaries, details = _compute_daily_summary(conn, service_date)
             items_by_therapist = _kiosk_items_by_therapist(details)
+            coupon_totals = _kiosk_coupon_totals(details)
             hpb_totals = _kiosk_hpb_totals(details)
             p_totals = _kiosk_p_totals(details)
             r_totals = _kiosk_r_totals(details)
             recent = _kiosk_recent_treatments(conn, service_date)
+            guarantee_rows = q(
+                conn,
+                "SELECT therapist_id, paid_amount FROM payouts WHERE service_date = ? AND method = ?",
+                (service_date, "最低保証"),
+            )
+            guarantee_map = {int(r["therapist_id"]): int(r["paid_amount"]) for r in guarantee_rows}
+            selected_payout = None
+            guarantee_lock = False
+            if selected_therapist_id > 0:
+                payout_row = q1(
+                    conn,
+                    "SELECT * FROM payouts WHERE service_date = ? AND therapist_id = ?",
+                    (service_date, selected_therapist_id),
+                )
+                if payout_row and str(payout_row["method"]) == "最低保証":
+                    selected_payout = payout_row
+                    cnt_row = q1(
+                        conn,
+                        "SELECT COUNT(*) AS cnt FROM treatments WHERE service_date = ? AND therapist_id = ?",
+                        (service_date, selected_therapist_id),
+                    )
+                    guarantee_lock = cnt_row is not None and int(cnt_row["cnt"]) == 0
             return render_template(
                 "kiosk.html",
                 service_date=service_date,
@@ -51,11 +163,15 @@ def create_app() -> Flask:
                 menus=menus,
                 summaries=summaries,
                 items_by_therapist=items_by_therapist,
+                coupon_totals=coupon_totals,
                 hpb_totals=hpb_totals,
                 p_totals=p_totals,
                 r_totals=r_totals,
                 recent=recent,
                 selected_therapist_id=selected_therapist_id,
+                selected_payout=selected_payout,
+                guarantee_lock=guarantee_lock,
+                guarantee_map=guarantee_map,
             )
         finally:
             conn.close()
@@ -89,19 +205,30 @@ def create_app() -> Flask:
 
         conn = connect()
         try:
+            if _payout_exists(conn, service_date, therapist_id):
+                flash(
+                    "ชำระเงินแล้ว กรุณายกเลิกการชำระก่อนเพิ่มงาน / 支払済みを取り消してから施術を追加してください。",
+                    "error",
+                )
+                return redirect(url_for("kiosk", date=service_date, therapist_id=therapist_id, _anchor="summary"))
+
             # 最大2メニュー。割引/ポイント/指名料は1件目にのみ付けて二重計上を防ぐ。
             conn.execute(
                 """
-                INSERT INTO treatments(service_date, therapist_id, menu_id, quantity, hpb, p, r, notes, created_at)
-                VALUES (?, ?, ?, ?, ?, ?, ?, NULL, ?)
+                INSERT INTO treatments(
+                  service_date, therapist_id, menu_id, quantity, hpb, p, r, notes, count_as_customer, created_at
+                )
+                VALUES (?, ?, ?, ?, ?, ?, ?, NULL, 1, ?)
                 """,
                 (service_date, therapist_id, menu_id_1, quantity, hpb, p, r, now_iso()),
             )
             if menu_id_2 > 0:
                 conn.execute(
                     """
-                    INSERT INTO treatments(service_date, therapist_id, menu_id, quantity, hpb, p, r, notes, created_at)
-                    VALUES (?, ?, ?, ?, 0, 0, 0, NULL, ?)
+                    INSERT INTO treatments(
+                      service_date, therapist_id, menu_id, quantity, hpb, p, r, notes, count_as_customer, created_at
+                    )
+                    VALUES (?, ?, ?, ?, 0, 0, 0, NULL, 0, ?)
                     """,
                     (service_date, therapist_id, menu_id_2, quantity, now_iso()),
                 )
@@ -110,7 +237,321 @@ def create_app() -> Flask:
             if continue_add:
                 # 同じセラピストで続けてメニューを追加しやすくする
                 return redirect(url_for("kiosk", date=service_date, therapist_id=therapist_id, _anchor="input"))
-            return redirect(url_for("kiosk", _anchor="summary"))
+            return redirect(url_for("kiosk", date=service_date, _anchor="summary"))
+        finally:
+            conn.close()
+
+    @app.post("/kiosk/guarantee")
+    def kiosk_guarantee():
+        service_date = (request.form.get("service_date") or date.today().isoformat()).strip()
+        try:
+            therapist_id = int(request.form.get("therapist_id") or "0")
+            guarantee_amount = int(request.form.get("guarantee_amount") or "0")
+        except (TypeError, ValueError):
+            flash("最低保証額は数字で入力してください。", "error")
+            return redirect(url_for("kiosk", date=service_date))
+
+        if therapist_id <= 0:
+            flash("セラピストを選択してください。", "error")
+            return redirect(url_for("kiosk", date=service_date))
+        if guarantee_amount < DAILY_MINIMUM_PAYOUT_YEN:
+            flash("最低保証額は5,000円以上で入力してください。", "error")
+            return redirect(url_for("kiosk", date=service_date, therapist_id=therapist_id))
+
+        conn = connect()
+        try:
+            row = q1(
+                conn,
+                "SELECT COUNT(*) AS cnt FROM treatments WHERE service_date = ? AND therapist_id = ?",
+                (service_date, therapist_id),
+            )
+            if row and int(row["cnt"]) > 0:
+                flash("この日に施術があるため最低保証は登録できません。", "error")
+                return redirect(url_for("kiosk", date=service_date, therapist_id=therapist_id))
+
+            topup_row = q1(
+                conn,
+                "SELECT amount FROM payout_topups WHERE service_date = ? AND therapist_id = ?",
+                (service_date, therapist_id),
+            )
+            if topup_row:
+                flash(
+                    "กรุณาลบเงินเพิ่มก่อนบันทึกค่าจ้างขั้นต่ำ / 不足分を削除してから最低保証を登録してください。",
+                    "error",
+                )
+                return redirect(url_for("kiosk", date=service_date, therapist_id=therapist_id, _anchor="summary"))
+
+            now = datetime.now().replace(microsecond=0).isoformat()
+            conn.execute(
+                """
+                INSERT INTO payouts(service_date, therapist_id, paid_amount, paid_at, method, notes)
+                VALUES (?, ?, ?, ?, ?, ?)
+                ON CONFLICT(service_date, therapist_id)
+                DO UPDATE SET paid_amount=excluded.paid_amount, paid_at=excluded.paid_at, method=excluded.method, notes=excluded.notes
+                """,
+                (service_date, therapist_id, guarantee_amount, now, "最低保証", "最低保証"),
+            )
+            conn.commit()
+            flash("最低保証を記録しました。", "ok")
+            return redirect(url_for("kiosk", date=service_date, therapist_id=therapist_id, _anchor="summary"))
+        finally:
+            conn.close()
+
+    @app.post("/kiosk/guarantee/delete")
+    def kiosk_guarantee_delete():
+        service_date = (request.form.get("service_date") or date.today().isoformat()).strip()
+        therapist_id = int(request.form.get("therapist_id") or "0")
+
+        if therapist_id <= 0:
+            flash("セラピストを選択してください。", "error")
+            return redirect(url_for("kiosk", date=service_date))
+
+        conn = connect()
+        try:
+            row = q1(
+                conn,
+                "SELECT * FROM payouts WHERE service_date = ? AND therapist_id = ?",
+                (service_date, therapist_id),
+            )
+            if not row or str(row["method"]) != "最低保証":
+                flash("最低保証の記録が見つかりません。", "error")
+                return redirect(url_for("kiosk", date=service_date, therapist_id=therapist_id))
+            conn.execute(
+                "DELETE FROM payouts WHERE service_date = ? AND therapist_id = ?",
+                (service_date, therapist_id),
+            )
+            conn.commit()
+            flash("最低保証を削除しました。", "ok")
+            return redirect(url_for("kiosk", date=service_date, therapist_id=therapist_id))
+        finally:
+            conn.close()
+
+    @app.post("/kiosk/payout-topup")
+    def kiosk_payout_topup():
+        service_date = (request.form.get("service_date") or date.today().isoformat()).strip()
+        try:
+            therapist_id = int(request.form.get("therapist_id") or "0")
+            topup_amount = int(request.form.get("topup_amount") or "0")
+        except (TypeError, ValueError):
+            flash("กรุณาใส่จำนวนเงินเป็นตัวเลข / 不足分は数字で入力してください。", "error")
+            return redirect(url_for("kiosk", date=service_date))
+
+        if therapist_id <= 0:
+            flash("กรุณาเลือกพนักงาน / セラピストを選択してください。", "error")
+            return redirect(url_for("kiosk", date=service_date))
+        if topup_amount <= 0:
+            flash("กรุณาใส่เงินที่ขาดมากกว่า 0 เยน / 不足分は1円以上で入力してください。", "error")
+            return redirect(url_for("kiosk", date=service_date, therapist_id=therapist_id))
+
+        conn = connect()
+        try:
+            treatment_row = q1(
+                conn,
+                "SELECT COUNT(*) AS cnt FROM treatments WHERE service_date = ? AND therapist_id = ?",
+                (service_date, therapist_id),
+            )
+            if not treatment_row or int(treatment_row["cnt"]) == 0:
+                flash(
+                    "วันนี้ยังไม่มีงาน กรุณาใช้ค่าจ้างขั้นต่ำ / 施術がない日は「最低保証」を使ってください。",
+                    "error",
+                )
+                return redirect(url_for("kiosk", date=service_date, therapist_id=therapist_id))
+
+            payout_row = q1(
+                conn,
+                "SELECT id FROM payouts WHERE service_date = ? AND therapist_id = ?",
+                (service_date, therapist_id),
+            )
+            if payout_row:
+                flash(
+                    "ชำระเงินแล้ว กรุณายกเลิกการชำระก่อนแก้ไข / 支払済みを取り消してから不足分を変更してください。",
+                    "error",
+                )
+                return redirect(url_for("kiosk", date=service_date, therapist_id=therapist_id))
+
+            summaries, _ = _compute_daily_summary(conn, service_date)
+            target = next(
+                (s for s in summaries if int(s["therapist_id"]) == therapist_id),
+                None,
+            )
+            base_payout = int(target["base_payout_total"]) if target else 0
+            maximum_topup = max(0, DAILY_MINIMUM_PAYOUT_YEN - base_payout)
+            if maximum_topup == 0:
+                flash("ค่าจ้างถึง 5,000 เยนแล้ว / 施術分が5,000円以上のため不足はありません。", "error")
+                return redirect(url_for("kiosk", date=service_date, therapist_id=therapist_id))
+            if topup_amount > maximum_topup:
+                flash(
+                    f"ใส่ได้ไม่เกิน {maximum_topup:,} เยน / 不足分は最大{maximum_topup:,}円です。",
+                    "error",
+                )
+                return redirect(url_for("kiosk", date=service_date, therapist_id=therapist_id))
+
+            conn.execute(
+                """
+                INSERT INTO payout_topups(service_date, therapist_id, amount, updated_at)
+                VALUES (?, ?, ?, ?)
+                ON CONFLICT(service_date, therapist_id)
+                DO UPDATE SET amount=excluded.amount, updated_at=excluded.updated_at
+                """,
+                (service_date, therapist_id, topup_amount, now_iso()),
+            )
+            conn.commit()
+            flash("บันทึกเงินเพิ่มแล้ว / 不足分を保存しました。", "ok")
+            return redirect(
+                url_for(
+                    "kiosk",
+                    date=service_date,
+                    therapist_id=therapist_id,
+                    _anchor=f"summary-staff-{therapist_id}",
+                )
+            )
+        finally:
+            conn.close()
+
+    @app.post("/kiosk/payout-topup/delete")
+    def kiosk_payout_topup_delete():
+        service_date = (request.form.get("service_date") or date.today().isoformat()).strip()
+        try:
+            therapist_id = int(request.form.get("therapist_id") or "0")
+        except (TypeError, ValueError):
+            therapist_id = 0
+
+        if therapist_id <= 0:
+            flash("กรุณาเลือกพนักงาน / セラピストを選択してください。", "error")
+            return redirect(url_for("kiosk", date=service_date))
+
+        conn = connect()
+        try:
+            payout_row = q1(
+                conn,
+                "SELECT id FROM payouts WHERE service_date = ? AND therapist_id = ?",
+                (service_date, therapist_id),
+            )
+            if payout_row:
+                flash(
+                    "ชำระเงินแล้ว กรุณายกเลิกการชำระก่อนลบ / 支払済みを取り消してから不足分を削除してください。",
+                    "error",
+                )
+                return redirect(url_for("kiosk", date=service_date, therapist_id=therapist_id))
+
+            cursor = conn.execute(
+                "DELETE FROM payout_topups WHERE service_date = ? AND therapist_id = ?",
+                (service_date, therapist_id),
+            )
+            if cursor.rowcount == 0:
+                flash("ไม่พบเงินเพิ่ม / 不足分の記録が見つかりません。", "error")
+                return redirect(url_for("kiosk", date=service_date, therapist_id=therapist_id))
+            conn.commit()
+            flash("ลบเงินเพิ่มแล้ว / 不足分を削除しました。", "ok")
+            return redirect(
+                url_for(
+                    "kiosk",
+                    date=service_date,
+                    therapist_id=therapist_id,
+                    _anchor=f"summary-staff-{therapist_id}",
+                )
+            )
+        finally:
+            conn.close()
+
+    # ----------------
+    # Supplies
+    # ----------------
+    @app.post("/supplies/new")
+    def supplies_new():
+        name = (request.form.get("name") or "").strip()
+        if not name:
+            flash("備品名は必須です。", "error")
+            return _redirect_supplies()
+        conn = connect()
+        try:
+            existing = q1(conn, "SELECT id FROM supplies WHERE name = ?", (name,))
+            if existing:
+                flash("同名の備品が既に登録されています。", "error")
+                return _redirect_supplies()
+            exec1(
+                conn,
+                """
+                INSERT INTO supplies(name, is_active, created_at)
+                VALUES (?, 1, ?)
+                """,
+                (name, now_iso()),
+            )
+            flash("備品を追加しました。", "ok")
+            return _redirect_supplies()
+        finally:
+            conn.close()
+
+    @app.post("/supplies/<int:supply_id>/notify")
+    def supplies_notify(supply_id: int):
+        conn = connect()
+        try:
+            supply = q1(conn, "SELECT * FROM supplies WHERE id = ? AND is_active = 1", (supply_id,))
+            if not supply:
+                flash("対象の備品が見つかりません。", "error")
+                return _redirect_supplies()
+            open_alert = q1(
+                conn,
+                "SELECT id FROM supply_alerts WHERE supply_id = ? AND status = 'open'",
+                (supply_id,),
+            )
+            if open_alert:
+                flash("既に通知済みです。", "error")
+                return _redirect_supplies()
+            exec1(
+                conn,
+                """
+                INSERT INTO supply_alerts(supply_id, status, created_at, acknowledged_at)
+                VALUES (?, 'open', ?, NULL)
+                """,
+                (supply_id, now_iso()),
+            )
+            flash("不足の通知を送信しました。", "ok")
+            return _redirect_supplies()
+        finally:
+            conn.close()
+
+    @app.post("/supplies/alerts/<int:alert_id>/ack")
+    def supply_alert_ack(alert_id: int):
+        conn = connect()
+        try:
+            alert = q1(conn, "SELECT * FROM supply_alerts WHERE id = ?", (alert_id,))
+            if not alert:
+                flash("対象の通知が見つかりません。", "error")
+                return _redirect_supplies()
+            if str(alert["status"]) != "open":
+                flash("既に対応済みです。", "error")
+                return _redirect_supplies()
+            conn.execute(
+                "UPDATE supply_alerts SET status = 'ack', acknowledged_at = ? WHERE id = ?",
+                (now_iso(), alert_id),
+            )
+            conn.commit()
+            flash("通知を対応済みにしました。", "ok")
+            return _redirect_supplies()
+        finally:
+            conn.close()
+
+    @app.post("/supplies/<int:supply_id>/rename")
+    def supplies_rename(supply_id: int):
+        name = (request.form.get("name") or "").strip()
+        if not name:
+            flash("備品名は必須です。", "error")
+            return _redirect_supplies()
+        conn = connect()
+        try:
+            supply = q1(conn, "SELECT id FROM supplies WHERE id = ?", (supply_id,))
+            if not supply:
+                flash("対象の備品が見つかりません。", "error")
+                return _redirect_supplies()
+            dup = q1(conn, "SELECT id FROM supplies WHERE name = ? AND id != ?", (name, supply_id))
+            if dup:
+                flash("同名の備品が既に登録されています。", "error")
+                return _redirect_supplies()
+            conn.execute("UPDATE supplies SET name = ? WHERE id = ?", (name, supply_id))
+            conn.commit()
+            flash("備品名を更新しました。", "ok")
+            return _redirect_supplies()
         finally:
             conn.close()
 
@@ -137,7 +578,7 @@ def create_app() -> Flask:
             service_date = str(t["service_date"])
 
             therapists = q(conn, "SELECT * FROM therapists ORDER BY is_active DESC, name ASC, id ASC")
-            menus = q(conn, "SELECT * FROM menus ORDER BY is_active DESC, name ASC, id ASC")
+            menus = q(conn, "SELECT * FROM menus ORDER BY is_active DESC, display_id ASC, id ASC")
             return render_template(
                 "kiosk_edit.html",
                 service_date=service_date,
@@ -175,6 +616,21 @@ def create_app() -> Flask:
                 flash("対象の入力が見つかりません。", "error")
                 return redirect(url_for("kiosk", _anchor="history"))
 
+            old_service_date = str(row["service_date"])
+            old_therapist_id = int(row["therapist_id"])
+            if _payout_exists(conn, old_service_date, old_therapist_id):
+                flash(
+                    "ชำระเงินแล้ว กรุณายกเลิกการชำระก่อนแก้ไขงาน / 支払済みを取り消してから施術を変更してください。",
+                    "error",
+                )
+                return redirect(url_for("kiosk", date=return_date or old_service_date, _anchor="history"))
+            if old_therapist_id != therapist_id and _payout_exists(conn, old_service_date, therapist_id):
+                flash(
+                    "พนักงานปลายทางชำระเงินแล้ว กรุณายกเลิกก่อน / 変更先が支払済みです。先に支払取消してください。",
+                    "error",
+                )
+                return redirect(url_for("kiosk", date=return_date or old_service_date, _anchor="history"))
+
             conn.execute(
                 """
                 UPDATE treatments
@@ -183,6 +639,12 @@ def create_app() -> Flask:
                 """,
                 (therapist_id, menu_id, hpb, p, r, treatment_id),
             )
+            if int(row["therapist_id"]) != therapist_id:
+                _delete_topup_if_no_treatments(
+                    conn,
+                    str(row["service_date"]),
+                    int(row["therapist_id"]),
+                )
             conn.commit()
             flash("Updated / แก้ไขแล้ว", "ok")
             back_date = return_date or str(row["service_date"])
@@ -199,7 +661,18 @@ def create_app() -> Flask:
             if not row:
                 flash("対象の入力が見つかりません。", "error")
                 return redirect(url_for("kiosk", _anchor="history"))
+            if _payout_exists(conn, str(row["service_date"]), int(row["therapist_id"])):
+                flash(
+                    "ชำระเงินแล้ว กรุณายกเลิกการชำระก่อนลบงาน / 支払済みを取り消してから施術を削除してください。",
+                    "error",
+                )
+                return redirect(url_for("kiosk", date=return_date or str(row["service_date"]), _anchor="history"))
             conn.execute("DELETE FROM treatments WHERE id = ?", (treatment_id,))
+            _delete_topup_if_no_treatments(
+                conn,
+                str(row["service_date"]),
+                int(row["therapist_id"]),
+            )
             conn.commit()
             flash("Deleted / ลบแล้ว", "ok")
             back_date = return_date or str(row["service_date"])
@@ -226,11 +699,72 @@ def create_app() -> Flask:
                 out[tid].append({"treatment_id": treatment_id, "menu_name": name, "price": price})
         return out
 
+    def _load_supply_context(conn):
+        supplies = q(
+            conn,
+            """
+            SELECT
+              s.*,
+              (
+                SELECT COUNT(*)
+                FROM supply_alerts sa
+                WHERE sa.supply_id = s.id AND sa.status = 'open'
+              ) AS open_alerts
+            FROM supplies s
+            WHERE s.is_active = 1
+            ORDER BY s.name ASC, s.id ASC
+            """,
+        )
+        raw_alerts = q(
+            conn,
+            """
+            SELECT sa.id, sa.created_at, s.name AS supply_name
+            FROM supply_alerts sa
+            JOIN supplies s ON s.id = sa.supply_id
+            WHERE sa.status = 'open'
+            ORDER BY sa.created_at DESC, sa.id DESC
+            """,
+        )
+        supply_alerts = []
+        for row in raw_alerts:
+            alert = dict(row)
+            alert["created_at_jst"] = _format_jst(alert.get("created_at"))
+            supply_alerts.append(alert)
+        return supplies, supply_alerts
+
+    def _format_jst(value: Optional[str]) -> str:
+        if not value:
+            return ""
+        raw = value.strip()
+        try:
+            if raw.endswith("Z"):
+                raw = raw[:-1] + "+00:00"
+            dt = datetime.fromisoformat(raw)
+        except ValueError:
+            return value
+        if dt.tzinfo is None:
+            dt = dt.replace(tzinfo=timezone.utc)
+        jst = dt.astimezone(timezone(timedelta(hours=9)))
+        return jst.strftime("%Y-%m-%d %H:%M")
+
+    def _redirect_supplies():
+        ref = request.referrer or ""
+        if ref.startswith(request.host_url):
+            return redirect(ref)
+        return redirect(url_for("supplies_page"))
+
     def _kiosk_hpb_totals(details: List[Dict[str, object]]) -> Dict[int, int]:
         totals: Dict[int, int] = {}
         for d in details:
             tid = int(d["therapist_id"])
             totals[tid] = int(totals.get(tid, 0)) + int(d.get("hpb", 0))
+        return totals
+
+    def _kiosk_coupon_totals(details: List[Dict[str, object]]) -> Dict[int, int]:
+        totals: Dict[int, int] = {}
+        for d in details:
+            tid = int(d["therapist_id"])
+            totals[tid] = int(totals.get(tid, 0)) + int(d.get("coupon_discount", 0))
         return totals
 
     def _kiosk_p_totals(details: List[Dict[str, object]]) -> Dict[int, int]:
@@ -325,10 +859,14 @@ def create_app() -> Flask:
     # ----------------
     @app.get("/menus")
     def menus_list():
+        order = (request.args.get("order") or "asc").strip().lower()
+        if order not in ("asc", "desc"):
+            order = "asc"
+        sort_dir = "DESC" if order == "desc" else "ASC"
         conn = connect()
         try:
-            rows = q(conn, "SELECT * FROM menus ORDER BY is_active DESC, name ASC, id ASC")
-            return render_template("menus_list.html", menus=rows)
+            rows = q(conn, f"SELECT * FROM menus ORDER BY is_active DESC, display_id {sort_dir}, id {sort_dir}")
+            return render_template("menus_list.html", menus=rows, order=order)
         finally:
             conn.close()
 
@@ -346,8 +884,10 @@ def create_app() -> Flask:
 
     @app.post("/menus/<int:menu_id>/edit")
     def menus_edit_post(menu_id: int):
+        display_id = int(request.form.get("display_id") or "0")
         name = (request.form.get("name") or "").strip()
         price = int(request.form.get("price") or "0")
+        coupon_discount = int(request.form.get("coupon_discount") or "0")
         is_active = 1 if (request.form.get("is_active") == "on") else 0
 
         commission_type = (request.form.get("commission_type") or "").strip() or None
@@ -357,8 +897,14 @@ def create_app() -> Flask:
         if not name:
             flash("メニュー名は必須です。", "error")
             return redirect(url_for("menus_edit", menu_id=menu_id))
+        if display_id <= 0:
+            flash("IDは1以上の番号で入力してください。", "error")
+            return redirect(url_for("menus_edit", menu_id=menu_id))
         if price < 0:
             flash("金額が不正です。", "error")
+            return redirect(url_for("menus_edit", menu_id=menu_id))
+        if coupon_discount < 0:
+            flash("クーポン割引額が不正です。", "error")
             return redirect(url_for("menus_edit", menu_id=menu_id))
         if commission_type is not None and commission_type not in ("percent", "fixed"):
             flash("歩合タイプが不正です。", "error")
@@ -368,17 +914,18 @@ def create_app() -> Flask:
 
         conn = connect()
         try:
-            m = q1(conn, "SELECT id FROM menus WHERE id = ?", (menu_id,))
+            m = q1(conn, "SELECT * FROM menus WHERE id = ?", (menu_id,))
             if not m:
                 flash("対象のメニューが見つかりません。", "error")
                 return redirect(url_for("menus_list"))
+
             conn.execute(
                 """
                 UPDATE menus
-                SET name = ?, price = ?, commission_type = ?, commission_value = ?, is_active = ?
+                SET display_id = ?, name = ?, price = ?, coupon_discount = ?, commission_type = ?, commission_value = ?, is_active = ?
                 WHERE id = ?
                 """,
-                (name, price, commission_type, commission_value, is_active, menu_id),
+                (display_id, name, price, coupon_discount, commission_type, commission_value, is_active, menu_id),
             )
             conn.commit()
             flash("メニューを更新しました。", "ok")
@@ -388,8 +935,11 @@ def create_app() -> Flask:
 
     @app.post("/menus/new")
     def menus_new():
+        display_id_raw = (request.form.get("display_id") or "").strip()
+        display_id = int(display_id_raw) if display_id_raw else None
         name = (request.form.get("name") or "").strip()
         price = int(request.form.get("price") or "0")
+        coupon_discount = int(request.form.get("coupon_discount") or "0")
         is_active = 1 if (request.form.get("is_active") == "on") else 0
 
         commission_type = (request.form.get("commission_type") or "").strip() or None
@@ -399,8 +949,14 @@ def create_app() -> Flask:
         if not name:
             flash("メニュー名は必須です。", "error")
             return redirect(url_for("menus_list"))
+        if display_id is not None and display_id <= 0:
+            flash("IDは1以上の番号で入力してください。", "error")
+            return redirect(url_for("menus_list"))
         if price < 0:
             flash("金額が不正です。", "error")
+            return redirect(url_for("menus_list"))
+        if coupon_discount < 0:
+            flash("クーポン割引額が不正です。", "error")
             return redirect(url_for("menus_list"))
         if commission_type is not None and commission_type not in ("percent", "fixed"):
             flash("歩合タイプが不正です。", "error")
@@ -408,14 +964,17 @@ def create_app() -> Flask:
 
         conn = connect()
         try:
-            exec1(
+            new_id = exec1(
                 conn,
                 """
-                INSERT INTO menus(name, price, commission_type, commission_value, is_active, created_at)
-                VALUES (?, ?, ?, ?, ?, ?)
+                INSERT INTO menus(display_id, name, price, coupon_discount, commission_type, commission_value, is_active, created_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
                 """,
-                (name, price, commission_type, commission_value, is_active, now_iso()),
+                (display_id, name, price, coupon_discount, commission_type, commission_value, is_active, now_iso()),
             )
+            if display_id is None:
+                conn.execute("UPDATE menus SET display_id = ? WHERE id = ?", (new_id, new_id))
+                conn.commit()
             flash("メニューを追加しました。", "ok")
             return redirect(url_for("menus_list"))
         finally:
@@ -442,7 +1001,7 @@ def create_app() -> Flask:
     # ----------------
     def _load_active_therapists_and_menus(conn):
         therapists = q(conn, "SELECT * FROM therapists WHERE is_active = 1 ORDER BY name ASC, id ASC")
-        menus = q(conn, "SELECT * FROM menus WHERE is_active = 1 ORDER BY name ASC, id ASC")
+        menus = q(conn, "SELECT * FROM menus WHERE is_active = 1 ORDER BY display_id ASC, id ASC")
         return therapists, menus
 
     @app.get("/treatments")
@@ -512,15 +1071,19 @@ def create_app() -> Flask:
 
         conn = connect()
         try:
+            if _payout_exists(conn, service_date, therapist_id):
+                flash("支払済みを取り消してから施術を追加してください。", "error")
+                return redirect(url_for("treatments_list", date=service_date))
+
             exec1(
                 conn,
                 """
                 INSERT INTO treatments(
                   service_date, therapist_id, menu_id, quantity, hpb, p, r,
                   price_override, commission_type_override, commission_value_override,
-                  notes, created_at
+                  notes, count_as_customer, created_at
                 )
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?)
                 """,
                 (
                     service_date,
@@ -547,7 +1110,23 @@ def create_app() -> Flask:
         service_date = (request.form.get("service_date") or date.today().isoformat()).strip()
         conn = connect()
         try:
+            row = q1(
+                conn,
+                "SELECT service_date, therapist_id FROM treatments WHERE id = ?",
+                (treatment_id,),
+            )
+            if not row:
+                flash("対象の施術が見つかりません。", "error")
+                return redirect(url_for("treatments_list", date=service_date))
+            if _payout_exists(conn, str(row["service_date"]), int(row["therapist_id"])):
+                flash("支払済みを取り消してから施術を削除してください。", "error")
+                return redirect(url_for("treatments_list", date=service_date))
             conn.execute("DELETE FROM treatments WHERE id = ?", (treatment_id,))
+            _delete_topup_if_no_treatments(
+                conn,
+                str(row["service_date"]),
+                int(row["therapist_id"]),
+            )
             conn.commit()
             flash("削除しました。", "ok")
             return redirect(url_for("treatments_list", date=service_date))
@@ -574,7 +1153,7 @@ def create_app() -> Flask:
                 return redirect(url_for("treatments_list"))
 
             therapists = q(conn, "SELECT * FROM therapists ORDER BY is_active DESC, name ASC, id ASC")
-            menus = q(conn, "SELECT * FROM menus ORDER BY is_active DESC, name ASC, id ASC")
+            menus = q(conn, "SELECT * FROM menus ORDER BY is_active DESC, display_id ASC, id ASC")
 
             return render_template(
                 "treatments_edit.html",
@@ -624,10 +1203,26 @@ def create_app() -> Flask:
 
         conn = connect()
         try:
-            row = q1(conn, "SELECT id FROM treatments WHERE id = ?", (treatment_id,))
+            row = q1(
+                conn,
+                "SELECT id, service_date, therapist_id FROM treatments WHERE id = ?",
+                (treatment_id,),
+            )
             if not row:
                 flash("対象の施術が見つかりません。", "error")
                 return redirect(url_for("treatments_list", date=service_date))
+
+            old_service_date = str(row["service_date"])
+            old_therapist_id = int(row["therapist_id"])
+            if _payout_exists(conn, old_service_date, old_therapist_id):
+                flash("支払済みを取り消してから施術を変更してください。", "error")
+                return redirect(url_for("treatments_list", date=old_service_date))
+            if (
+                (old_service_date != service_date or old_therapist_id != therapist_id)
+                and _payout_exists(conn, service_date, therapist_id)
+            ):
+                flash("変更先が支払済みです。先に支払取消してください。", "error")
+                return redirect(url_for("treatments_list", date=old_service_date))
 
             conn.execute(
                 """
@@ -661,6 +1256,12 @@ def create_app() -> Flask:
                     treatment_id,
                 ),
             )
+            if str(row["service_date"]) != service_date or int(row["therapist_id"]) != therapist_id:
+                _delete_topup_if_no_treatments(
+                    conn,
+                    str(row["service_date"]),
+                    int(row["therapist_id"]),
+                )
             conn.commit()
             flash("施術を更新しました。", "ok")
             return redirect(url_for("treatments_list", date=service_date))
@@ -685,6 +1286,7 @@ def create_app() -> Flask:
               t.commission_type_override,
               t.commission_value_override,
               t.notes,
+              t.count_as_customer,
               th.id AS therapist_id,
               th.name AS therapist_name,
               th.commission_type AS therapist_commission_type,
@@ -692,6 +1294,7 @@ def create_app() -> Flask:
               m.id AS menu_id,
               m.name AS menu_name,
               m.price AS menu_price,
+              m.coupon_discount AS menu_coupon_discount,
               m.commission_type AS menu_commission_type,
               m.commission_value AS menu_commission_value
             FROM treatments t
@@ -727,6 +1330,12 @@ def create_app() -> Flask:
                 p_points_yen=int(r["p"] or 0),
                 r_nomination_fee_yen=int(r["r"] or 0),
             )
+            coupon_discount_total = int(r["menu_coupon_discount"] or 0) * max(1, int(r["quantity"]))
+            count_as_customer = (
+                int(r["count_as_customer"])
+                if r["count_as_customer"] is not None
+                else 1
+            )
 
             detail_lines.append(
                 {
@@ -735,10 +1344,12 @@ def create_app() -> Flask:
                     "therapist_name": r["therapist_name"],
                     "menu_name": r["menu_name"],
                     "quantity": int(r["quantity"]),
+                    "count_as_customer": count_as_customer,
                     "hpb": int(r["hpb"] or 0),
                     "p": int(r["p"] or 0),
                     "r": int(r["r"] or 0),
                     "price": price,
+                    "coupon_discount": coupon_discount_total,
                     "gross_menu": gross_menu,
                     "discount_total": discount_total,
                     "net_menu": net_menu,
@@ -756,22 +1367,104 @@ def create_app() -> Flask:
                     "therapist_id": tid,
                     "therapist_name": r["therapist_name"],
                     "sales_total": 0,
+                    "base_payout_total": 0,
+                    "topup_amount": 0,
                     "payout_total": 0,
+                    "customer_count": 0,
+                    "is_legacy_guarantee": False,
+                    "has_treatments": True,
                 }
             per_therapist[tid]["sales_total"] = int(per_therapist[tid]["sales_total"]) + sales
+            per_therapist[tid]["base_payout_total"] = int(per_therapist[tid]["base_payout_total"]) + payout
             per_therapist[tid]["payout_total"] = int(per_therapist[tid]["payout_total"]) + payout
+            if count_as_customer:
+                per_therapist[tid]["customer_count"] = int(per_therapist[tid]["customer_count"]) + int(
+                    r["quantity"]
+                )
+
+        topup_rows = q(
+            conn,
+            """
+            SELECT pt.*, th.name AS therapist_name
+            FROM payout_topups pt
+            JOIN therapists th ON th.id = pt.therapist_id
+            WHERE pt.service_date = ?
+            """,
+            (service_date,),
+        )
+        for topup in topup_rows:
+            tid = int(topup["therapist_id"])
+            if tid not in per_therapist:
+                per_therapist[tid] = {
+                    "therapist_id": tid,
+                    "therapist_name": topup["therapist_name"],
+                    "sales_total": 0,
+                    "base_payout_total": 0,
+                    "topup_amount": 0,
+                    "payout_total": 0,
+                    "customer_count": 0,
+                    "is_legacy_guarantee": False,
+                    "has_treatments": False,
+                }
+            amount = int(topup["amount"])
+            per_therapist[tid]["topup_amount"] = amount
+            per_therapist[tid]["payout_total"] = int(per_therapist[tid]["base_payout_total"]) + amount
 
         payout_rows = q(
             conn,
-            "SELECT * FROM payouts WHERE service_date = ?",
+            """
+            SELECT p.*, th.name AS therapist_name
+            FROM payouts p
+            JOIN therapists th ON th.id = p.therapist_id
+            WHERE p.service_date = ?
+            """,
             (service_date,),
         )
         paid_map = {int(p["therapist_id"]): p for p in payout_rows}
         for tid, s in per_therapist.items():
-            s["paid"] = tid in paid_map
-            s["paid_amount"] = int(paid_map[tid]["paid_amount"]) if tid in paid_map else 0
-            s["paid_at"] = paid_map[tid]["paid_at"] if tid in paid_map else None
-            s["paid_method"] = paid_map[tid]["method"] if tid in paid_map else None
+            payout_row = paid_map.get(tid)
+            paid_notes = str(payout_row["notes"] or "") if payout_row else ""
+            s["paid"] = payout_row is not None
+            s["paid_amount"] = int(payout_row["paid_amount"]) if payout_row else 0
+            s["paid_at"] = payout_row["paid_at"] if payout_row else None
+            s["paid_method"] = payout_row["method"] if payout_row else None
+            s["paid_notes"] = paid_notes
+            s["minimum_payout_exception"] = MINIMUM_PAYOUT_EXCEPTION_NOTE_PREFIX in paid_notes
+            s["is_legacy_guarantee"] = (
+                payout_row is not None
+                and str(payout_row["method"] or "") == "最低保証"
+                and not bool(s["has_treatments"])
+            )
+
+        for tid, p in paid_map.items():
+            if tid in per_therapist:
+                continue
+            is_legacy_guarantee = str(p["method"] or "") == "最低保証"
+            paid_amount = int(p["paid_amount"])
+            per_therapist[tid] = {
+                "therapist_id": tid,
+                "therapist_name": p["therapist_name"],
+                "sales_total": 0,
+                "base_payout_total": 0 if is_legacy_guarantee else paid_amount,
+                "topup_amount": paid_amount if is_legacy_guarantee else 0,
+                "payout_total": paid_amount,
+                "customer_count": 0,
+                "paid": True,
+                "paid_amount": paid_amount,
+                "paid_at": p["paid_at"],
+                "paid_method": p["method"],
+                "paid_notes": str(p["notes"] or ""),
+                "minimum_payout_exception": MINIMUM_PAYOUT_EXCEPTION_NOTE_PREFIX
+                in str(p["notes"] or ""),
+                "is_legacy_guarantee": is_legacy_guarantee,
+                "has_treatments": False,
+            }
+
+        for summary in per_therapist.values():
+            summary["shortfall_to_minimum"] = max(
+                0,
+                DAILY_MINIMUM_PAYOUT_YEN - int(summary["base_payout_total"]),
+            )
 
         summaries = sorted(per_therapist.values(), key=lambda x: (str(x["therapist_name"]), int(x["therapist_id"])))
         return summaries, detail_lines
@@ -803,12 +1496,28 @@ def create_app() -> Flask:
             w.writerow(["日付", service_date])
             w.writerow([])
             w.writerow(["セラピスト別集計"])
-            w.writerow(["セラピスト", "売上合計(円)", "支払合計(円)", "支払済み", "支払額(円)", "支払日時", "支払方法"])
+            w.writerow(
+                [
+                    "セラピスト",
+                    "客数",
+                    "売上合計(円)",
+                    "施術分(円)",
+                    "不足分(円)",
+                    "支払合計(円)",
+                    "支払済み",
+                    "支払額(円)",
+                    "支払日時",
+                    "支払方法",
+                ]
+            )
             for s in summaries:
                 w.writerow(
                     [
                         s["therapist_name"],
+                        s["customer_count"],
                         s["sales_total"],
+                        s["base_payout_total"],
+                        s["topup_amount"],
                         s["payout_total"],
                         "済" if s["paid"] else "未",
                         s["paid_amount"],
@@ -819,18 +1528,39 @@ def create_app() -> Flask:
 
             w.writerow([])
             w.writerow(["明細"])
-            w.writerow(["施術ID", "セラピスト", "メニュー", "数量", "HPB", "P", "R", "単価(円)", "売上(円)", "歩合タイプ", "歩合値", "支払(円)", "メモ"])
+            w.writerow(
+                [
+                    "施術ID",
+                    "セラピスト",
+                    "メニュー",
+                    "数量",
+                    "客数計上数量",
+                    "HPB",
+                    "P",
+                    "R",
+                    "単価(円)",
+                    "クーポン割引(円)",
+                    "売上(円)",
+                    "歩合タイプ",
+                    "歩合値",
+                    "支払(円)",
+                    "メモ",
+                ]
+            )
             for d in details:
+                cust_qty = int(d["quantity"]) if int(d.get("count_as_customer") or 0) else 0
                 w.writerow(
                     [
                         d["treatment_id"],
                         d["therapist_name"],
                         d["menu_name"],
                         d["quantity"],
+                        cust_qty,
                         d["hpb"],
                         d["p"],
                         d["r"],
                         d["price"],
+                        d["coupon_discount"],
                         d["sales"],
                         d["rule_type"],
                         d["rule_value"],
@@ -850,12 +1580,530 @@ def create_app() -> Flask:
         finally:
             conn.close()
 
+    @app.get("/reports/payouts.csv")
+    def report_payouts_csv():
+        conn = connect()
+        try:
+            rows = q(
+                conn,
+                """
+                SELECT
+                  p.service_date,
+                  p.therapist_id,
+                  th.name AS therapist_name,
+                  p.paid_amount,
+                  p.paid_at,
+                  p.method,
+                  p.notes
+                FROM payouts p
+                JOIN therapists th ON th.id = p.therapist_id
+                ORDER BY p.service_date DESC, th.name ASC, p.id ASC
+                """,
+            )
+            output = io.StringIO()
+            w = csv.writer(output)
+            w.writerow(["日付", "セラピスト", "支払額(円)", "支払日時", "支払方法", "メモ"])
+            for r in rows:
+                w.writerow(
+                    [
+                        r["service_date"],
+                        r["therapist_name"],
+                        r["paid_amount"],
+                        r["paid_at"],
+                        r["method"] or "",
+                        r["notes"] or "",
+                    ]
+                )
+
+            bom = "\ufeff"
+            csv_bytes = (bom + output.getvalue()).encode("utf-8")
+            filename = "payouts.csv"
+            return Response(
+                csv_bytes,
+                mimetype="text/csv; charset=utf-8",
+                headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+            )
+        finally:
+            conn.close()
+
+    # ----------------
+    # Staff Report (per-therapist, date range)
+    # ----------------
+    def _staff_report_rows(conn, date_from: str, date_to: str, therapist_id: Optional[int] = None):
+        base_sql = """
+            SELECT
+              t.id,
+              t.service_date,
+              t.quantity,
+              t.hpb,
+              t.p,
+              t.r,
+              t.price_override,
+              t.commission_type_override,
+              t.commission_value_override,
+              t.notes,
+              t.count_as_customer,
+              th.id AS therapist_id,
+              th.name AS therapist_name,
+              th.commission_type AS therapist_commission_type,
+              th.commission_value AS therapist_commission_value,
+              m.id AS menu_id,
+              m.name AS menu_name,
+              m.price AS menu_price,
+              m.coupon_discount AS menu_coupon_discount,
+              m.commission_type AS menu_commission_type,
+              m.commission_value AS menu_commission_value
+            FROM treatments t
+            JOIN therapists th ON th.id = t.therapist_id
+            JOIN menus m ON m.id = t.menu_id
+            WHERE t.service_date BETWEEN ? AND ?
+        """
+        if therapist_id:
+            return q(conn, base_sql + " AND t.therapist_id = ? ORDER BY th.name ASC, t.service_date ASC, t.id ASC", (date_from, date_to, therapist_id))
+        return q(conn, base_sql + " ORDER BY th.name ASC, t.service_date ASC, t.id ASC", (date_from, date_to))
+
+    def _payout_topup_rows(conn, date_from: str, date_to: str, therapist_id: Optional[int] = None):
+        base_sql = """
+            SELECT
+              pt.service_date,
+              pt.therapist_id,
+              pt.amount,
+              pt.updated_at,
+              th.name AS therapist_name
+            FROM payout_topups pt
+            JOIN therapists th ON th.id = pt.therapist_id
+            WHERE pt.service_date BETWEEN ? AND ?
+        """
+        if therapist_id:
+            return q(
+                conn,
+                base_sql + " AND pt.therapist_id = ? ORDER BY th.name ASC, pt.service_date ASC",
+                (date_from, date_to, therapist_id),
+            )
+        return q(conn, base_sql + " ORDER BY th.name ASC, pt.service_date ASC", (date_from, date_to))
+
+    def _legacy_guarantee_rows(conn, date_from: str, date_to: str, therapist_id: Optional[int] = None):
+        base_sql = """
+            SELECT
+              p.service_date,
+              p.therapist_id,
+              p.paid_amount AS amount,
+              p.paid_at AS updated_at,
+              th.name AS therapist_name
+            FROM payouts p
+            JOIN therapists th ON th.id = p.therapist_id
+            WHERE p.service_date BETWEEN ? AND ?
+              AND p.method = '最低保証'
+              AND NOT EXISTS (
+                SELECT 1
+                FROM treatments t
+                WHERE t.service_date = p.service_date
+                  AND t.therapist_id = p.therapist_id
+              )
+        """
+        if therapist_id:
+            return q(
+                conn,
+                base_sql + " AND p.therapist_id = ? ORDER BY th.name ASC, p.service_date ASC",
+                (date_from, date_to, therapist_id),
+            )
+        return q(conn, base_sql + " ORDER BY th.name ASC, p.service_date ASC", (date_from, date_to))
+
+    def _compute_staff_details(rows) -> List[Dict[str, object]]:
+        detail_lines: List[Dict[str, object]] = []
+        for r in rows:
+            price = int(r["price_override"]) if r["price_override"] is not None else int(r["menu_price"])
+            rule = pick_commission_rule(
+                r["commission_type_override"],
+                r["commission_value_override"],
+                r["menu_commission_type"],
+                r["menu_commission_value"],
+                r["therapist_commission_type"],
+                r["therapist_commission_value"],
+            )
+            gross_menu, discount_total, net_menu, sales, payout = calc_treatment_yen(
+                unit_price_yen=price,
+                quantity=int(r["quantity"]),
+                rule=rule,
+                hpb_discount_yen=int(r["hpb"] or 0),
+                p_points_yen=int(r["p"] or 0),
+                r_nomination_fee_yen=int(r["r"] or 0),
+            )
+            coupon_discount_total = int(r["menu_coupon_discount"] or 0) * max(1, int(r["quantity"]))
+            count_as_customer = (
+                int(r["count_as_customer"])
+                if r["count_as_customer"] is not None
+                else 1
+            )
+            detail_lines.append({
+                "treatment_id": r["id"],
+                "therapist_id": r["therapist_id"],
+                "therapist_name": r["therapist_name"],
+                "service_date": r["service_date"],
+                "menu_name": r["menu_name"],
+                "quantity": int(r["quantity"]),
+                "count_as_customer": count_as_customer,
+                "hpb": int(r["hpb"] or 0),
+                "p": int(r["p"] or 0),
+                "r": int(r["r"] or 0),
+                "price": price,
+                "coupon_discount": coupon_discount_total,
+                "gross_menu": gross_menu,
+                "discount_total": discount_total,
+                "net_menu": net_menu,
+                "sales": sales,
+                "rule_type": rule.commission_type,
+                "rule_value": rule.commission_value,
+                "payout": payout,
+                "notes": r["notes"] or "",
+            })
+        return detail_lines
+
+    def _parse_month(month_value: Optional[str]) -> date:
+        today = date.today()
+        raw = (month_value or today.strftime("%Y-%m")).strip()
+        try:
+            return datetime.strptime(raw[:7] + "-01", "%Y-%m-%d").date()
+        except ValueError:
+            return today.replace(day=1)
+
+    def _shift_month(month_start: date, offset: int) -> date:
+        month_index = month_start.year * 12 + (month_start.month - 1) + offset
+        return date(month_index // 12, (month_index % 12) + 1, 1)
+
+    def _monthly_calendar(details: List[Dict[str, object]], month_start: date) -> Tuple[List[List[Dict[str, object]]], Dict[str, int]]:
+        next_month = _shift_month(month_start, 1)
+        month_end = next_month - timedelta(days=1)
+        daily: Dict[str, Dict[str, int]] = {}
+
+        for d in details:
+            day = str(d["service_date"])
+            bucket = daily.setdefault(day, {"sales": 0, "customers": 0})
+            bucket["sales"] += int(d["sales"])
+            if int(d.get("count_as_customer") or 0):
+                bucket["customers"] += int(d["quantity"])
+
+        cells: List[Dict[str, object]] = []
+        for _ in range(month_start.weekday()):
+            cells.append({"date": None})
+
+        current = month_start
+        today_iso = date.today().isoformat()
+        while current <= month_end:
+            key = current.isoformat()
+            totals = daily.get(key, {"sales": 0, "customers": 0})
+            cells.append(
+                {
+                    "date": key,
+                    "day": current.day,
+                    "weekday": current.weekday(),
+                    "sales": totals["sales"],
+                    "customers": totals["customers"],
+                    "has_record": bool(totals["sales"] or totals["customers"]),
+                    "is_today": key == today_iso,
+                }
+            )
+            current += timedelta(days=1)
+
+        while len(cells) % 7:
+            cells.append({"date": None})
+
+        weeks = [cells[i : i + 7] for i in range(0, len(cells), 7)]
+        totals = {
+            "sales": sum(int(v["sales"]) for v in daily.values()),
+            "customers": sum(int(v["customers"]) for v in daily.values()),
+            "active_days": sum(1 for v in daily.values() if int(v["sales"]) or int(v["customers"])),
+        }
+        return weeks, totals
+
+    @app.get("/reports/monthly")
+    def report_monthly():
+        month_start = _parse_month(request.args.get("month"))
+        next_month = _shift_month(month_start, 1)
+        month_end = next_month - timedelta(days=1)
+        date_from = month_start.isoformat()
+        date_to = month_end.isoformat()
+        conn = connect()
+        try:
+            rows = _staff_report_rows(conn, date_from, date_to, None)
+            details = _compute_staff_details(rows)
+            weeks, totals = _monthly_calendar(details, month_start)
+            return render_template(
+                "report_monthly.html",
+                month=month_start.strftime("%Y-%m"),
+                month_label=f"{month_start.year}年{month_start.month}月",
+                prev_month=_shift_month(month_start, -1).strftime("%Y-%m"),
+                next_month=next_month.strftime("%Y-%m"),
+                weekday_labels=["月", "火", "水", "木", "金", "土", "日"],
+                weeks=weeks,
+                totals=totals,
+            )
+        finally:
+            conn.close()
+
+    @app.get("/reports/staff")
+    def report_staff():
+        today = date.today().isoformat()
+        date_from = (request.args.get("date_from") or today[:8] + "01").strip()
+        date_to = (request.args.get("date_to") or today).strip()
+        therapist_id = int(request.args.get("therapist_id") or "0")
+        conn = connect()
+        try:
+            therapists = q(conn, "SELECT * FROM therapists ORDER BY is_active DESC, name ASC, id ASC")
+            rows = _staff_report_rows(conn, date_from, date_to, therapist_id or None)
+            details = _compute_staff_details(rows)
+            topups = _payout_topup_rows(conn, date_from, date_to, therapist_id or None)
+            legacy_guarantees = _legacy_guarantee_rows(conn, date_from, date_to, therapist_id or None)
+            totals: Dict[int, Dict[str, object]] = {}
+            for d in details:
+                tid = int(d["therapist_id"])
+                if tid not in totals:
+                    totals[tid] = {
+                        "therapist_name": d["therapist_name"],
+                        "sales": 0,
+                        "topup": 0,
+                        "payout": 0,
+                        "line_count": 0,
+                        "customer_count": 0,
+                    }
+                totals[tid]["sales"] = int(totals[tid]["sales"]) + int(d["sales"])
+                totals[tid]["payout"] = int(totals[tid]["payout"]) + int(d["payout"])
+                totals[tid]["line_count"] = int(totals[tid]["line_count"]) + 1
+                if int(d.get("count_as_customer") or 0):
+                    totals[tid]["customer_count"] = int(totals[tid]["customer_count"]) + int(d["quantity"])
+            for supplement in [*topups, *legacy_guarantees]:
+                tid = int(supplement["therapist_id"])
+                if tid not in totals:
+                    totals[tid] = {
+                        "therapist_name": supplement["therapist_name"],
+                        "sales": 0,
+                        "topup": 0,
+                        "payout": 0,
+                        "line_count": 0,
+                        "customer_count": 0,
+                    }
+                amount = int(supplement["amount"])
+                totals[tid]["topup"] = int(totals[tid]["topup"]) + amount
+                totals[tid]["payout"] = int(totals[tid]["payout"]) + amount
+            therapist_totals = sorted(totals.values(), key=lambda x: str(x["therapist_name"]))
+            return render_template(
+                "report_staff.html",
+                date_from=date_from,
+                date_to=date_to,
+                therapist_id=therapist_id,
+                therapists=therapists,
+                details=details,
+                therapist_totals=therapist_totals,
+            )
+        finally:
+            conn.close()
+
+    @app.get("/reports/staff.csv")
+    def report_staff_csv():
+        today = date.today().isoformat()
+        date_from = (request.args.get("date_from") or today[:8] + "01").strip()
+        date_to = (request.args.get("date_to") or today).strip()
+        therapist_id = int(request.args.get("therapist_id") or "0")
+        conn = connect()
+        try:
+            rows = _staff_report_rows(conn, date_from, date_to, therapist_id or None)
+            details = _compute_staff_details(rows)
+            topups = _payout_topup_rows(conn, date_from, date_to, therapist_id or None)
+            legacy_guarantees = _legacy_guarantee_rows(conn, date_from, date_to, therapist_id or None)
+            output = io.StringIO()
+            w = csv.writer(output)
+            w.writerow(
+                [
+                    "セラピスト",
+                    "日付",
+                    "メニュー",
+                    "単価(円)",
+                    "クーポン割引(円)",
+                    "HPB割引(円)",
+                    "P割引(円)",
+                    "指名料R(円)",
+                    "売上(円)",
+                    "歩合タイプ",
+                    "歩合値",
+                    "スタッフ支払(円)",
+                    "客数計上数量",
+                    "メモ",
+                ]
+            )
+            for d in details:
+                cust_qty = int(d["quantity"]) if int(d.get("count_as_customer") or 0) else 0
+                w.writerow([
+                    d["therapist_name"],
+                    d["service_date"],
+                    d["menu_name"],
+                    d["price"],
+                    d["coupon_discount"],
+                    d["hpb"],
+                    d["p"],
+                    d["r"],
+                    d["sales"],
+                    "%" if d["rule_type"] == "percent" else "固定",
+                    d["rule_value"],
+                    d["payout"],
+                    cust_qty,
+                    d["notes"],
+                ])
+            for topup in topups:
+                w.writerow(
+                    [
+                        topup["therapist_name"],
+                        topup["service_date"],
+                        "最低保証の不足分",
+                        "",
+                        "",
+                        "",
+                        "",
+                        "",
+                        0,
+                        "",
+                        "",
+                        int(topup["amount"]),
+                        0,
+                        "手動入力",
+                    ]
+                )
+            for guarantee in legacy_guarantees:
+                w.writerow(
+                    [
+                        guarantee["therapist_name"],
+                        guarantee["service_date"],
+                        "最低保証（客数0人）",
+                        "",
+                        "",
+                        "",
+                        "",
+                        "",
+                        0,
+                        "",
+                        "",
+                        int(guarantee["amount"]),
+                        0,
+                        "支払済み",
+                    ]
+                )
+            bom = "\ufeff"
+            csv_bytes = (bom + output.getvalue()).encode("utf-8")
+            therapist_part = f"_t{therapist_id}" if therapist_id else "_all"
+            filename = f"staff_{date_from}_{date_to}{therapist_part}.csv"
+            return Response(
+                csv_bytes,
+                mimetype="text/csv; charset=utf-8",
+                headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+            )
+        finally:
+            conn.close()
+
+    @app.get("/reports/sales_daily.csv")
+    def report_sales_daily_csv():
+        """Salesops_v3 への取込用：期間内の日別売上・客数・HPB/P割引合計をCSV出力する。
+
+        出力ヘッダ: 発生日, 売上, 客数, HPB割引合計, P割引合計
+        - 発生日: YYYY-MM-DD 形式
+        - 売上: 期間内施術の sales 合計（= net_menu + R、HPB/P 控除後）
+        - 客数: count_as_customer=1 の施術に限り quantity を加算
+        - HPB割引合計 / P割引合計: 参考値（Salesops_v3 側の取込対象外）
+        - 文字コード: UTF-8 (BOM付き)
+        """
+        today = date.today().isoformat()
+        date_from = (request.args.get("date_from") or today[:8] + "01").strip()
+        date_to = (request.args.get("date_to") or today).strip()
+        conn = connect()
+        try:
+            rows = _staff_report_rows(conn, date_from, date_to, None)
+            details = _compute_staff_details(rows)
+
+            daily: Dict[str, Dict[str, int]] = {}
+            for d in details:
+                key = str(d["service_date"])
+                bucket = daily.setdefault(
+                    key, {"sales": 0, "customers": 0, "hpb": 0, "p": 0}
+                )
+                bucket["sales"] += int(d["sales"])
+                if int(d.get("count_as_customer") or 0):
+                    bucket["customers"] += int(d["quantity"])
+                bucket["hpb"] += int(d["hpb"] or 0)
+                bucket["p"] += int(d["p"] or 0)
+
+            output = io.StringIO()
+            w = csv.writer(output)
+            w.writerow(["発生日", "売上", "客数", "HPB割引合計", "P割引合計"])
+            for day in sorted(daily.keys()):
+                b = daily[day]
+                w.writerow([day, b["sales"], b["customers"], b["hpb"], b["p"]])
+
+            bom = "\ufeff"
+            csv_bytes = (bom + output.getvalue()).encode("utf-8")
+            filename = f"sales_daily_{date_from}_{date_to}.csv"
+            return Response(
+                csv_bytes,
+                mimetype="text/csv; charset=utf-8",
+                headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+            )
+        finally:
+            conn.close()
+
+    @app.post("/reports/sales_daily_missing.csv")
+    def report_sales_daily_missing_csv():
+        """Salesops/カード明細CSVを照合し、未登録日のみ日別売上CSVを出力する。"""
+        today = date.today().isoformat()
+        date_from = (request.form.get("date_from") or today[:8] + "01").strip()
+        date_to = (request.form.get("date_to") or today).strip()
+        existing_file = request.files.get("existing_csv")
+        if not existing_file or not (existing_file.filename or "").strip():
+            flash("既存CSVファイルを選択してください。", "error")
+            return redirect(request.referrer or url_for("admin"))
+
+        existing_dates = extract_existing_sales_dates(existing_file.read())
+        conn = connect()
+        try:
+            rows = _staff_report_rows(conn, date_from, date_to, None)
+            details = _compute_staff_details(rows)
+
+            daily: Dict[str, Dict[str, int]] = {}
+            for d in details:
+                key = str(d["service_date"])
+                bucket = daily.setdefault(
+                    key, {"sales": 0, "customers": 0, "hpb": 0, "p": 0}
+                )
+                bucket["sales"] += int(d["sales"])
+                if int(d.get("count_as_customer") or 0):
+                    bucket["customers"] += int(d["quantity"])
+                bucket["hpb"] += int(d["hpb"] or 0)
+                bucket["p"] += int(d["p"] or 0)
+
+            output = io.StringIO()
+            w = csv.writer(output)
+            w.writerow(["発生日", "売上", "客数", "HPB割引合計", "P割引合計"])
+            for day in sorted(daily.keys()):
+                if day in existing_dates:
+                    continue
+                b = daily[day]
+                w.writerow([day, b["sales"], b["customers"], b["hpb"], b["p"]])
+
+            bom = "\ufeff"
+            csv_bytes = (bom + output.getvalue()).encode("utf-8")
+            filename = f"sales_daily_missing_{date_from}_{date_to}.csv"
+            return Response(
+                csv_bytes,
+                mimetype="text/csv; charset=utf-8",
+                headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+            )
+        finally:
+            conn.close()
+
     @app.post("/payouts/mark_paid")
     def payout_mark_paid():
         service_date = (request.form.get("service_date") or date.today().isoformat()).strip()
         therapist_id = int(request.form.get("therapist_id") or "0")
         method = (request.form.get("method") or "").strip() or None
         notes = (request.form.get("notes") or "").strip() or None
+        allow_below_minimum = request.form.get("allow_below_minimum") == "1"
+        exception_reason = (request.form.get("exception_reason") or "").strip()
 
         conn = connect()
         try:
@@ -866,6 +2114,51 @@ def create_app() -> Flask:
                 return redirect(url_for("report_daily", date=service_date))
 
             paid_amount = int(target["payout_total"])
+            required_topup = max(
+                0,
+                DAILY_MINIMUM_PAYOUT_YEN - int(target["base_payout_total"]),
+            )
+            current_topup = int(target["topup_amount"])
+            is_below_minimum = paid_amount < DAILY_MINIMUM_PAYOUT_YEN
+            if is_below_minimum and allow_below_minimum:
+                if not bool(target.get("has_treatments")):
+                    flash("施術記録がない日は、この例外では支払済みにできません。", "error")
+                    return redirect(url_for("report_daily", date=service_date))
+                if not exception_reason:
+                    flash("กรุณาใส่เหตุผล / 例外理由を入力してください。", "error")
+                    return redirect(url_for("report_daily", date=service_date))
+                if len(exception_reason) > 100:
+                    flash("例外理由は100文字以内で入力してください。", "error")
+                    return redirect(url_for("report_daily", date=service_date))
+                exception_note = (
+                    f"{MINIMUM_PAYOUT_EXCEPTION_NOTE_PREFIX}（理由：{exception_reason}）"
+                )
+                notes = (
+                    f"{exception_note} / {notes}"
+                    if notes
+                    else exception_note
+                )
+            elif is_below_minimum:
+                topup_instruction = (
+                    f"不足分{required_topup:,}円を入力してから支払済みにする"
+                    if current_topup == 0
+                    else f"不足分を{required_topup:,}円にしてから支払済みにする"
+                )
+                flash(
+                    f"支払合計が{paid_amount:,}円です。{topup_instruction}か、"
+                    "短時間勤務などの場合は「例外：この金額で支払済」を選んでください。",
+                    "error",
+                )
+                return redirect(url_for("report_daily", date=service_date))
+            elif current_topup != required_topup:
+                if required_topup == 0:
+                    message = "施術分が5,000円以上です。登録済みの不足分を削除してから支払済みにしてください。"
+                elif current_topup == 0:
+                    message = f"支払合計が{paid_amount:,}円です。不足分{required_topup:,}円を入力してから支払済みにしてください。"
+                else:
+                    message = f"不足分を現在必要な{required_topup:,}円にしてから支払済みにしてください。"
+                flash(message, "error")
+                return redirect(url_for("report_daily", date=service_date))
             now = datetime.now().replace(microsecond=0).isoformat()
             conn.execute(
                 """
@@ -877,7 +2170,75 @@ def create_app() -> Flask:
                 (service_date, therapist_id, paid_amount, now, method, notes),
             )
             conn.commit()
-            flash("支払い済みにしました。", "ok")
+            if is_below_minimum:
+                flash(
+                    f"例外（{exception_reason}）として、{paid_amount:,}円で支払い済みにしました。",
+                    "ok",
+                )
+            else:
+                flash("支払い済みにしました。", "ok")
+            return redirect(url_for("report_daily", date=service_date))
+        finally:
+            conn.close()
+
+    @app.post("/payouts/mark_paid_all")
+    def payout_mark_paid_all():
+        service_date = (request.form.get("service_date") or date.today().isoformat()).strip()
+        method = (request.form.get("method") or "").strip() or "一括"
+        notes = (request.form.get("notes") or "").strip() or "一括支払済"
+
+        conn = connect()
+        try:
+            summaries, _ = _compute_daily_summary(conn, service_date)
+            unpaid = [s for s in summaries if not s.get("paid")]
+            if not unpaid:
+                flash("支払い済みにする未払いの集計がありません。", "error")
+                return redirect(url_for("report_daily", date=service_date))
+
+            below_minimum = [s for s in unpaid if int(s["payout_total"]) < DAILY_MINIMUM_PAYOUT_YEN]
+            if below_minimum:
+                names = "、".join(str(s["therapist_name"]) for s in below_minimum)
+                flash(
+                    f"{names}の支払合計が5,000円未満です。不足分を入力するか、"
+                    "個別に「例外：この金額で支払済」を選んでください。",
+                    "error",
+                )
+                return redirect(url_for("report_daily", date=service_date))
+
+            stale_topups = [
+                s
+                for s in unpaid
+                if int(s["topup_amount"])
+                != max(0, DAILY_MINIMUM_PAYOUT_YEN - int(s["base_payout_total"]))
+            ]
+            if stale_topups:
+                names = "、".join(str(s["therapist_name"]) for s in stale_topups)
+                flash(
+                    f"{names}の不足分が現在の施術分と合いません。不足分を修正してからまとめて支払済みにしてください。",
+                    "error",
+                )
+                return redirect(url_for("report_daily", date=service_date))
+
+            now = datetime.now().replace(microsecond=0).isoformat()
+            for s in unpaid:
+                conn.execute(
+                    """
+                    INSERT INTO payouts(service_date, therapist_id, paid_amount, paid_at, method, notes)
+                    VALUES (?, ?, ?, ?, ?, ?)
+                    ON CONFLICT(service_date, therapist_id)
+                    DO UPDATE SET paid_amount=excluded.paid_amount, paid_at=excluded.paid_at, method=excluded.method, notes=excluded.notes
+                    """,
+                    (
+                        service_date,
+                        int(s["therapist_id"]),
+                        int(s["payout_total"]),
+                        now,
+                        method,
+                        notes,
+                    ),
+                )
+            conn.commit()
+            flash(f"{len(unpaid)}件を支払い済みにしました。", "ok")
             return redirect(url_for("report_daily", date=service_date))
         finally:
             conn.close()
@@ -903,4 +2264,3 @@ app = create_app()
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=5000, debug=True)
-

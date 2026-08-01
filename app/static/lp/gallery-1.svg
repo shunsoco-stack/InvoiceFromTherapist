@@ -1,0 +1,22 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="640" height="420" viewBox="0 0 640 420" role="img" aria-label="Reception illustration">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#2c1b12"/>
+      <stop offset="100%" stop-color="#b27a3a"/>
+    </linearGradient>
+    <radialGradient id="glow" cx="0.2" cy="0.2" r="0.7">
+      <stop offset="0%" stop-color="#f2d08a" stop-opacity="0.55"/>
+      <stop offset="100%" stop-color="#f2d08a" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+  <rect width="640" height="420" rx="32" fill="url(#bg)"/>
+  <rect width="640" height="420" rx="32" fill="url(#glow)"/>
+  <rect x="90" y="110" width="460" height="80" rx="18" fill="#1b1510" fill-opacity="0.7" stroke="#f2d08a" stroke-opacity="0.4"/>
+  <rect x="110" y="210" width="420" height="120" rx="20" fill="#1a1410" fill-opacity="0.8" stroke="#f2d08a" stroke-opacity="0.35"/>
+  <rect x="150" y="145" width="120" height="24" rx="12" fill="#f2d08a" fill-opacity="0.7"/>
+  <rect x="300" y="145" width="160" height="12" rx="6" fill="#ffffff" fill-opacity="0.2"/>
+  <circle cx="210" cy="250" r="18" fill="#f2d08a" fill-opacity="0.7"/>
+  <rect x="190" y="266" width="40" height="10" rx="5" fill="#ffffff" fill-opacity="0.2"/>
+  <rect x="330" y="250" width="160" height="12" rx="6" fill="#ffffff" fill-opacity="0.16"/>
+  <rect x="330" y="274" width="120" height="10" rx="5" fill="#ffffff" fill-opacity="0.12"/>
+</svg>
