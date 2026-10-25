@@ -1,6 +1,7 @@
 {% extends "base.html" %}
 {% set title = "日次レポート" %}
 {% block content %}
+{% set minimum_payout = daily_minimum_payout_yen(service_date) %}
   <div class="page-head">
     <h1>日次レポート</h1>
     <p class="muted">セラピスト別に「売上合計」と「支払合計（日払い）」を自動計算します。</p>
@@ -84,7 +85,7 @@
                     <input type="hidden" name="therapist_id" value="{{ s.therapist_id }}" />
                     <input name="method" placeholder="方法（例：現金）" aria-label="支払方法" />
                     <button class="btn" type="submit">支払済にする</button>
-                    {% if s.has_treatments and s.payout_total|int < 5000 %}
+                    {% if s.has_treatments and s.payout_total|int < minimum_payout %}
                       <div class="payoutException">
                         <p class="payoutException__help" lang="th">
                           ทำงานไม่เต็มวันเท่านั้น / <span lang="ja">短時間勤務など、例外の場合のみ</span>

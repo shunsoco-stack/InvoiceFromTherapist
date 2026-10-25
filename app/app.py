@@ -12,7 +12,10 @@ from app.csv_import import extract_existing_sales_dates
 from app.db import connect, exec1, init_db, now_iso, q, q1
 
 
-DAILY_MINIMUM_PAYOUT_YEN = 5000
+def daily_minimum_payout_yen(service_date: str) -> int:
+    """Apply the policy by service date; never rewrite recorded payments."""
+    return 6000 if date.fromisoformat(service_date) >= date(2026, 1, 1) else 5000
+
 MINIMUM_PAYOUT_EXCEPTION_NOTE_PREFIX = "最低保証対象外"
 
 
@@ -24,6 +27,8 @@ def create_app() -> Flask:
         template_folder="templates",
     )
     app.secret_key = os.getenv("SALON_SECRET_KEY", "dev-secret-key")  # ローカル運用想定
+
+    app.jinja_env.globals["daily_minimum_payout_yen"] = daily_minimum_payout_yen
 
     init_db()
 
@@ -254,8 +259,8 @@ def create_app() -> Flask:
         if therapist_id <= 0:
             flash("セラピストを選択してください。", "error")
             return redirect(url_for("kiosk", date=service_date))
-        if guarantee_amount < DAILY_MINIMUM_PAYOUT_YEN:
-            flash("最低保証額は5,000円以上で入力してください。", "error")
+        if guarantee_amount < daily_minimum_payout_yen(service_date):
+            flash(f"最低保証額は{daily_minimum_payout_yen(service_date):,}円以上で入力してください。", "error")
             return redirect(url_for("kiosk", date=service_date, therapist_id=therapist_id))
 
         conn = connect()
@@ -375,9 +380,9 @@ def create_app() -> Flask:
                 None,
             )
             base_payout = int(target["base_payout_total"]) if target else 0
-            maximum_topup = max(0, DAILY_MINIMUM_PAYOUT_YEN - base_payout)
+            maximum_topup = max(0, daily_minimum_payout_yen(service_date) - base_payout)
             if maximum_topup == 0:
-                flash("ค่าจ้างถึง 5,000 เยนแล้ว / 施術分が5,000円以上のため不足はありません。", "error")
+                flash(f"ค่าจ้างถึง {daily_minimum_payout_yen(service_date):,} เยนแล้ว / 施術分が{daily_minimum_payout_yen(service_date):,}円以上のため不足はありません。", "error")
                 return redirect(url_for("kiosk", date=service_date, therapist_id=therapist_id))
             if topup_amount > maximum_topup:
                 flash(
@@ -1463,7 +1468,7 @@ def create_app() -> Flask:
         for summary in per_therapist.values():
             summary["shortfall_to_minimum"] = max(
                 0,
-                DAILY_MINIMUM_PAYOUT_YEN - int(summary["base_payout_total"]),
+                daily_minimum_payout_yen(service_date) - int(summary["base_payout_total"]),
             )
 
         summaries = sorted(per_therapist.values(), key=lambda x: (str(x["therapist_name"]), int(x["therapist_id"])))
@@ -2116,10 +2121,10 @@ def create_app() -> Flask:
             paid_amount = int(target["payout_total"])
             required_topup = max(
                 0,
-                DAILY_MINIMUM_PAYOUT_YEN - int(target["base_payout_total"]),
+                daily_minimum_payout_yen(service_date) - int(target["base_payout_total"]),
             )
             current_topup = int(target["topup_amount"])
-            is_below_minimum = paid_amount < DAILY_MINIMUM_PAYOUT_YEN
+            is_below_minimum = paid_amount < daily_minimum_payout_yen(service_date)
             if is_below_minimum and allow_below_minimum:
                 if not bool(target.get("has_treatments")):
                     flash("施術記録がない日は、この例外では支払済みにできません。", "error")
@@ -2152,7 +2157,7 @@ def create_app() -> Flask:
                 return redirect(url_for("report_daily", date=service_date))
             elif current_topup != required_topup:
                 if required_topup == 0:
-                    message = "施術分が5,000円以上です。登録済みの不足分を削除してから支払済みにしてください。"
+                    message = f"施術分が{daily_minimum_payout_yen(service_date):,}円以上です。登録済みの不足分を削除してから支払済みにしてください。"
                 elif current_topup == 0:
                     message = f"支払合計が{paid_amount:,}円です。不足分{required_topup:,}円を入力してから支払済みにしてください。"
                 else:
@@ -2195,11 +2200,11 @@ def create_app() -> Flask:
                 flash("支払い済みにする未払いの集計がありません。", "error")
                 return redirect(url_for("report_daily", date=service_date))
 
-            below_minimum = [s for s in unpaid if int(s["payout_total"]) < DAILY_MINIMUM_PAYOUT_YEN]
+            below_minimum = [s for s in unpaid if int(s["payout_total"]) < daily_minimum_payout_yen(service_date)]
             if below_minimum:
                 names = "、".join(str(s["therapist_name"]) for s in below_minimum)
                 flash(
-                    f"{names}の支払合計が5,000円未満です。不足分を入力するか、"
+                    f"{names}の支払合計が{daily_minimum_payout_yen(service_date):,}円未満です。不足分を入力するか、"
                     "個別に「例外：この金額で支払済」を選んでください。",
                     "error",
                 )
@@ -2209,7 +2214,7 @@ def create_app() -> Flask:
                 s
                 for s in unpaid
                 if int(s["topup_amount"])
-                != max(0, DAILY_MINIMUM_PAYOUT_YEN - int(s["base_payout_total"]))
+                != max(0, daily_minimum_payout_yen(service_date) - int(s["base_payout_total"]))
             ]
             if stale_topups:
                 names = "、".join(str(s["therapist_name"]) for s in stale_topups)

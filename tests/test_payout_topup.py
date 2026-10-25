@@ -14,7 +14,8 @@ from app.db import connect, now_iso  # noqa: E402
 
 
 class PayoutTopupTests(unittest.TestCase):
-    service_date = "2026-08-01"
+    # Existing regression cases exercise the pre-2026 policy.
+    service_date = "2025-12-31"
 
     def setUp(self):
         os.environ["SALON_DB_PATH"] = str(TEST_DB)
@@ -718,6 +719,73 @@ class PayoutTopupTests(unittest.TestCase):
         ).data.decode("utf-8-sig")
         self.assertIn("最低保証（客数0人）", staff_csv)
         self.assertIn(",5000,0,支払済み", staff_csv)
+
+
+
+    def test_effective_date_boundaries(self):
+        from app.app import daily_minimum_payout_yen
+        for day, expected in (("2025-12-31", 5000), ("2026-01-01", 6000), ("2026-10-25", 6000)):
+            with self.subTest(day=day):
+                self.assertEqual(daily_minimum_payout_yen(day), expected)
+                body = self.client.get(f"/kiosk?date={day}").get_data(as_text=True)
+                self.assertIn(f'min="{expected}"', body)
+
+    def test_2026_commission_boundaries_and_manual_topup(self):
+        for index, commission in enumerate((5999, 6000, 6001)):
+            self.service_date = f"2026-01-0{index + 1}"
+            conn = connect()
+            conn.execute("UPDATE menus SET price = ? WHERE id = ?", (commission * 2, self.menu_id))
+            conn.commit()
+            conn.close()
+            self._add_treatment()
+            if commission < 6000:
+                self.client.post("/payouts/mark_paid", data={"service_date": self.service_date, "therapist_id": self.therapist_id})
+                self.assertEqual(self._daily_summary_rows()["テストスタッフ"][6], "未")
+                body = self._save_topup(2, follow_redirects=True).get_data(as_text=True)
+                self.assertIn("1", body)
+                self.assertEqual(self._daily_summary_rows()["テストスタッフ"][4], "0")
+                self._save_topup(1)
+            else:
+                self._save_topup(1)
+                self.assertEqual(self._daily_summary_rows()["テストスタッフ"][4], "0")
+            self.client.post("/payouts/mark_paid", data={"service_date": self.service_date, "therapist_id": self.therapist_id})
+            row = self._daily_summary_rows()["テストスタッフ"]
+            self.assertEqual(row[5], str(max(6000, commission)))
+            self.assertEqual(row[6], "済")
+            self.assertEqual(row[7], str(max(6000, commission)))
+
+    def test_2026_existing_exception_and_no_treatment_rules(self):
+        self.service_date = "2026-01-01"
+        self.test_explicit_below_minimum_exception_records_payment_and_audit_note()
+
+    def test_2026_no_treatment_guarantee_minimum(self):
+        self.service_date = "2026-01-01"
+        self._save_topup(6000)
+        for amount, count in ((5000, 0), (6000, 1)):
+            self.client.post("/kiosk/guarantee", data={"service_date": self.service_date, "therapist_id": self.therapist_id, "guarantee_amount": amount})
+            conn = connect()
+            self.assertEqual(conn.execute("SELECT COUNT(*) FROM payouts").fetchone()[0], count)
+            self.assertEqual(conn.execute("SELECT COUNT(*) FROM payout_topups").fetchone()[0], 0)
+            conn.close()
+
+    def test_2026_reading_reports_preserves_recorded_payment(self):
+        self.service_date = "2026-01-01"
+        self._add_treatment()
+        conn = connect()
+        conn.execute("INSERT INTO payout_topups(service_date, therapist_id, amount, updated_at) VALUES (?, ?, ?, ?)", (self.service_date, self.therapist_id, 2500, now_iso()))
+        conn.execute("INSERT INTO payouts(service_date, therapist_id, paid_amount, paid_at, method, notes) VALUES (?, ?, ?, ?, ?, ?)", (self.service_date, self.therapist_id, 5000, now_iso(), "現金", "旧基準で支払済み"))
+        conn.commit()
+        before = [tuple(row) for row in conn.execute("SELECT * FROM payouts")]
+        before_topups = [tuple(row) for row in conn.execute("SELECT * FROM payout_topups")]
+        body = self.client.get(f"/kiosk?date={self.service_date}").get_data(as_text=True)
+        self.assertIn("6,000円までの不足分", body)
+        self.assertIn("3,500円", body)
+        for endpoint in (f"/reports/daily?date={self.service_date}", f"/reports/staff?date_from={self.service_date}&date_to={self.service_date}", f"/reports/staff.csv?date_from={self.service_date}&date_to={self.service_date}"):
+            self.assertEqual(self.client.get(endpoint).status_code, 200)
+        self.assertEqual(self._daily_summary_rows()["テストスタッフ"][7], "5000")
+        self.assertEqual([tuple(row) for row in conn.execute("SELECT * FROM payouts")], before)
+        self.assertEqual([tuple(row) for row in conn.execute("SELECT * FROM payout_topups")], before_topups)
+        conn.close()
 
 
 if __name__ == "__main__":

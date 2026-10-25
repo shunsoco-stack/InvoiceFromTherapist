@@ -1,6 +1,7 @@
 {% extends "base.html" %}
 {% set title = "บันทึกงาน / 簡単入力" %}
 {% block content %}
+{% set minimum_payout = daily_minimum_payout_yen(service_date) %}
   <div class="kiosk">
     <div class="kiosk__head">
       <h1 class="kiosk__title">บันทึกงาน / 簡単入力</h1>
@@ -66,8 +67,8 @@
                      class="kioskInput"
                      type="number"
                      inputmode="numeric"
-                     min="5000"
-                     placeholder="5000"
+                     min="{{ minimum_payout }}"
+                     placeholder="{{ minimum_payout }}"
                      value="{% if selected_payout and selected_payout.method == '最低保証' %}{{ selected_payout.paid_amount }}{% endif %}"
                      form="kioskGuaranteeForm" />
               <button class="btn btn--secondary kioskSmallBtn" type="submit" form="kioskGuaranteeForm">บันทึกค่าจ้างขั้นต่ำ / 最低保証を記録</button>
@@ -244,11 +245,11 @@
                       <tr>
                         <td class="kioskSheetTd" colspan="2">
                           <div class="kioskAdjustment">
-                            <div class="kioskAdjustment__title">เงินเพิ่มให้ครบ 5,000 เยน / 5,000円までの不足分</div>
+                            <div class="kioskAdjustment__title">เงินเพิ่มให้ครบ {{ "{:,}".format(minimum_payout) }} เยน / {{ "{:,}".format(minimum_payout) }}円までの不足分</div>
                             <div class="kioskAdjustment__help muted" id="topup-help-{{ s.therapist_id }}">
                               ใส่เฉพาะจำนวนเงินที่ขาด / 足りない金額だけ入力
-                              {% if s.payout_total|int == 5000 %}
-                                （ครบ 5,000 เยนแล้ว / 5,000円になっています）
+                              {% if s.payout_total|int == minimum_payout %}
+                                （ครบ {{ "{:,}".format(minimum_payout) }} เยนแล้ว / {{ "{:,}".format(minimum_payout) }}円になっています）
                               {% elif s.topup_amount|int > s.shortfall_to_minimum|int %}
                                 （เงินเพิ่มสูงเกินไป สูงสุด {{ "{:,}".format(s.shortfall_to_minimum) }} เยน / 不足分は最大{{ "{:,}".format(s.shortfall_to_minimum) }}円）
                               {% else %}
@@ -369,7 +370,7 @@
         <ul class="list">
           <li lang="th"><b>ลำดับการกด:</b> พนักงาน → เมนูหลัก →（เมนูเสริม）→ บันทึก</li>
           <li lang="th">เมนูเสริมรวมในยอดขายและค่าจ้าง แต่ไม่นับลูกค้าเพิ่ม</li>
-          <li lang="th">ถ้าค่าจ้างยังไม่ถึง 5,000 เยน ให้ใส่เฉพาะเงินที่ขาดในช่อง “เงินเพิ่ม”</li>
+          <li lang="th">ถ้าค่าจ้างยังไม่ถึง {{ "{:,}".format(minimum_payout) }} เยน ให้ใส่เฉพาะเงินที่ขาดในช่อง “เงินเพิ่ม”</li>
           <li lang="th">ถ้ากรอกผิด ให้แก้ไขหรือลบในประวัติของวันที่เลือก</li>
         </ul>
       </section>
