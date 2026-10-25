@@ -1,0 +1,10 @@
+# ローカルでコンテナ動作確認用（Lightsail とは別）
+services:
+  web:
+    build: .
+    ports:
+      - "5000:5000"
+    environment:
+      SALON_SECRET_KEY: local-dev-only-change-me
+    volumes:
+      - ./data:/app/data

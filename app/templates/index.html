@@ -1,12 +1,24 @@
 {% extends "base.html" %}
-{% set title = "トップ" %}
+{% set title = "サロン入力システム" %}
 {% block content %}
   <div class="homeSimple">
+    {% if logo_url %}
+      <div class="homeSimple__logoWrap">
+        <img class="homeSimple__logo" src="{{ logo_url }}" alt="{{ logo_alt }}" />
+      </div>
+    {% endif %}
     <div class="homeSimple__title mono">{{ today }}</div>
     <div class="homeSimple__buttons">
-      <a class="btn homeSimple__btn homeSimple__btn--primary" href="{{ url_for('kiosk') }}">施術入力 / บันทึก</a>
-      <a class="btn btn--secondary homeSimple__btn homeSimple__btn--admin" href="{{ url_for('admin') }}">管理 / จัดการ</a>
+      <a class="btn homeSimple__btn homeSimple__btn--primary" href="{{ url_for('kiosk') }}">บันทึกงาน / 入力</a>
+      <a class="btn btn--secondary homeSimple__btn homeSimple__btn--admin" href="{{ url_for('admin') }}">จัดการร้าน / 管理</a>
+      <a class="btn btn--secondary homeSimple__btn homeSimple__btn--supplies"
+         href="{{ url_for('supplies_page') }}"
+         aria-label="ของใช้ในร้าน / 備品{% if supply_alerts_count and supply_alerts_count > 0 %}（มีการแจ้งเตือน {{ supply_alerts_count }} รายการ）{% endif %}">
+        <span class="homeSimple__btnLabel">ของใช้ในร้าน / 備品</span>
+        {% if supply_alerts_count and supply_alerts_count > 0 %}
+          <span class="homeSimple__btnBadge" aria-hidden="true">!</span>
+        {% endif %}
+      </a>
     </div>
   </div>
 {% endblock %}
-

@@ -1,0 +1,13 @@
+venv
+.venv
+__pycache__
+*.pyc
+.git
+.gitignore
+.cursor
+data
+*.md
+start-with-browser.bat
+.dockerignore
+Dockerfile
+docker-compose.yml

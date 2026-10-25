@@ -1,0 +1,472 @@
+{% extends "base.html" %}
+{% set title = "導入のご案内" %}
+{% set body_class = "body--landing" %}
+{% block content %}
+  <div class="landing" data-lang="jp">
+    <section class="lp-hero">
+      <div class="lp-hero__inner">
+        <div class="lp-hero__utility">
+          <span class="lp-hero__utilityLabel">
+            <span class="lang-jp">言語</span>
+            <span class="lang-th">ภาษา</span>
+          </span>
+          <button class="lp-langToggle" id="lang-toggle" type="button" aria-pressed="false" data-lang="jp">
+            <span class="lp-langToggle__item" data-lang="jp">日本語</span>
+            <span class="lp-langToggle__divider">/</span>
+            <span class="lp-langToggle__item" data-lang="th">ไทย</span>
+          </button>
+        </div>
+        <div class="lp-hero__layout">
+          <div class="lp-hero__copy">
+            {% if logo_url %}
+              <div class="lp-hero__logoWrap">
+                <img class="lp-hero__logo" src="{{ logo_url }}" alt="{{ logo_alt }}" />
+              </div>
+            {% endif %}
+            <p class="lp-hero__eyebrow">
+              <span class="lang-jp">個人サロン向け / プレミアム運用</span>
+              <span class="lang-th">สำหรับซาลอนส่วนตัว / การทำงานระดับพรีเมียม</span>
+            </p>
+            <h1 class="lp-hero__title lp-heading">
+              <span class="lp-heading__jp">施術記録と日払い計算を、品よく、速く。</span>
+              <span class="lp-heading__th">บันทึกการทำทรีตเมนต์และคำนวณค่าจ้างรายวัน อย่างมีระดับและรวดเร็ว</span>
+            </h1>
+            <p class="lp-hero__subtitle lp-textPair">
+              <span class="lp-textPair__jp">個人サロンに必要な機能だけを凝縮。入力の手間を減らし、日次集計を自動化します。</span>
+              <span class="lp-textPair__th">รวมเฉพาะฟังก์ชันที่จำเป็นสำหรับซาลอนส่วนตัว ลดขั้นตอนการกรอกข้อมูล และสรุปรายวันให้อัตโนมัติ</span>
+            </p>
+            <div class="lp-hero__actions">
+              <a class="btn lp-cta" href="#benefits">
+                <span class="lang-jp">導入メリット</span>
+                <span class="lang-th">ประโยชน์</span>
+              </a>
+              <a class="btn btn--secondary lp-cta lp-cta--ghost" href="#features">
+                <span class="lang-jp">機能紹介</span>
+                <span class="lang-th">ฟังก์ชัน</span>
+              </a>
+            </div>
+            <div class="lp-hero__badges">
+              <span class="lp-badge">
+                <span class="lang-jp">ローカル運用</span>
+                <span class="lang-th">ใช้งานแบบโลคัล</span>
+              </span>
+              <span class="lp-badge">
+                <span class="lang-jp">日払い自動計算</span>
+                <span class="lang-th">จ่ายรายวันอัตโนมัติ</span>
+              </span>
+              <span class="lp-badge">
+                <span class="lang-jp">CSV出力</span>
+                <span class="lang-th">ส่งออก CSV</span>
+              </span>
+            </div>
+          </div>
+          <div class="lp-hero__media">
+            <div class="lp-media lp-media--hero lp-media--midnight">
+              <img class="lp-media__img" src="{{ url_for('static', filename='lp/hero-main.svg') }}" alt="Salon visual" />
+            </div>
+            <div class="lp-mediaRow">
+              <div class="lp-media lp-media--mini lp-media--gold">
+                <img class="lp-media__img" src="{{ url_for('static', filename='lp/hero-mini-1.svg') }}" alt="Salon visual detail" />
+              </div>
+              <div class="lp-media lp-media--mini lp-media--rose">
+                <img class="lp-media__img" src="{{ url_for('static', filename='lp/hero-mini-2.svg') }}" alt="Salon visual detail" />
+              </div>
+              <div class="lp-media lp-media--mini lp-media--jade">
+                <img class="lp-media__img" src="{{ url_for('static', filename='lp/hero-mini-3.svg') }}" alt="Salon visual detail" />
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section id="benefits" class="lp-section">
+      <div class="lp-section__head">
+        <p class="lp-eyebrow">
+          <span class="lang-jp">メリット</span>
+          <span class="lang-th">ประโยชน์</span>
+        </p>
+        <h2 class="lp-heading">
+          <span class="lp-heading__jp">導入すると、こう変わります</span>
+          <span class="lp-heading__th">เมื่อใช้งานแล้ว จะเปลี่ยนไปแบบนี้</span>
+        </h2>
+        <p class="muted lp-textPair">
+          <span class="lp-textPair__jp">日々の入力と集計を、無理なく高品質に。</span>
+          <span class="lp-textPair__th">การบันทึกและสรุปรายวันเป็นระบบที่ง่ายและมีคุณภาพ</span>
+        </p>
+      </div>
+      <div class="lp-grid lp-grid--3">
+        <div class="lp-card lp-card--media">
+          <div class="lp-card__media lp-media lp-media--tile lp-media--gold">
+            <svg class="lp-media__icon" viewBox="0 0 64 64" aria-hidden="true">
+              <rect x="10" y="14" width="44" height="36" rx="8"></rect>
+              <circle cx="26" cy="30" r="4"></circle>
+              <path d="M16 44l12-12 8 8 8-10 12 14"></path>
+            </svg>
+          </div>
+          <h3 class="lp-card__title lp-heading">
+            <span class="lp-heading__jp">入力時間を最小化</span>
+            <span class="lp-heading__th">ลดเวลาในการบันทึก</span>
+          </h3>
+          <p class="muted lp-textPair">
+            <span class="lp-textPair__jp">大きいボタン中心の入力で、文字入力は最小限。忙しい時間帯でもスムーズに記録できます。</span>
+            <span class="lp-textPair__th">ปุ่มใหญ่เป็นหลัก ลดการพิมพ์ เหมาะกับช่วงเวลาที่ลูกค้าเยอะ</span>
+          </p>
+        </div>
+        <div class="lp-card lp-card--media">
+          <div class="lp-card__media lp-media lp-media--tile lp-media--rose">
+            <svg class="lp-media__icon" viewBox="0 0 64 64" aria-hidden="true">
+              <rect x="10" y="14" width="44" height="36" rx="8"></rect>
+              <path d="M22 42V30M32 42V24M42 42V34"></path>
+              <path d="M18 26H46"></path>
+            </svg>
+          </div>
+          <h3 class="lp-card__title lp-heading">
+            <span class="lp-heading__jp">日払い計算を自動化</span>
+            <span class="lp-heading__th">คำนวณจ่ายรายวันอัตโนมัติ</span>
+          </h3>
+          <p class="muted lp-textPair">
+            <span class="lp-textPair__jp">歩合と固定、メニュー別の上書きまで対応。手計算の不安から解放されます。</span>
+            <span class="lp-textPair__th">รองรับทั้งเปอร์เซ็นต์และแบบเหมา รวมถึงกำหนดตามเมนู ลดความผิดพลาดจากการคำนวณมือ</span>
+          </p>
+        </div>
+        <div class="lp-card lp-card--media">
+          <div class="lp-card__media lp-media lp-media--tile lp-media--jade">
+            <svg class="lp-media__icon" viewBox="0 0 64 64" aria-hidden="true">
+              <rect x="10" y="14" width="44" height="36" rx="8"></rect>
+              <path d="M20 32l6 6 10-12"></path>
+              <path d="M20 40l6 6 10-12"></path>
+            </svg>
+          </div>
+          <h3 class="lp-card__title lp-heading">
+            <span class="lp-heading__jp">集計の抜け漏れを防止</span>
+            <span class="lp-heading__th">ป้องกันการสรุปตกหล่น</span>
+          </h3>
+          <p class="muted lp-textPair">
+            <span class="lp-textPair__jp">日次レポートで売上と支払額を一覧化。支払済みの記録も残せます。</span>
+            <span class="lp-textPair__th">รายงานรายวันแสดงยอดขายและยอดจ่ายชัดเจน พร้อมบันทึกการจ่ายแล้ว</span>
+          </p>
+        </div>
+      </div>
+    </section>
+
+    <section id="features" class="lp-section">
+      <div class="lp-section__head">
+        <p class="lp-eyebrow">
+          <span class="lang-jp">機能</span>
+          <span class="lang-th">ฟังก์ชัน</span>
+        </p>
+        <h2 class="lp-heading">
+          <span class="lp-heading__jp">機能紹介</span>
+          <span class="lp-heading__th">ฟังก์ชันหลัก</span>
+        </h2>
+        <p class="muted lp-textPair">
+          <span class="lp-textPair__jp">個人サロンに必要な機能だけを、美しく整理しました。</span>
+          <span class="lp-textPair__th">คัดเฉพาะฟังก์ชันที่จำเป็นสำหรับซาลอนส่วนตัว จัดวางอย่างเรียบหรู</span>
+        </p>
+      </div>
+      <div class="lp-grid lp-grid--2">
+        <div class="lp-card lp-card--media">
+          <div class="lp-card__media lp-media lp-media--tile lp-media--pearl">
+            <svg class="lp-media__icon" viewBox="0 0 64 64" aria-hidden="true">
+              <rect x="10" y="14" width="44" height="36" rx="8"></rect>
+              <path d="M24 28a8 8 0 0 0 16 0"></path>
+              <path d="M20 44c3-6 21-6 24 0"></path>
+            </svg>
+          </div>
+          <h3 class="lp-card__title lp-heading">
+            <span class="lp-heading__jp">セラピスト管理</span>
+            <span class="lp-heading__th">จัดการพนักงาน</span>
+          </h3>
+          <p class="muted lp-textPair">
+            <span class="lp-textPair__jp">名前と歩合（% / 固定）を登録。運用に合わせて簡単に更新できます。</span>
+            <span class="lp-textPair__th">บันทึกชื่อและค่าคอมฯ (% / เหมา) ปรับแก้ได้ง่ายตามการใช้งาน</span>
+          </p>
+        </div>
+        <div class="lp-card lp-card--media">
+          <div class="lp-card__media lp-media lp-media--tile lp-media--amber">
+            <svg class="lp-media__icon" viewBox="0 0 64 64" aria-hidden="true">
+              <rect x="10" y="14" width="44" height="36" rx="8"></rect>
+              <path d="M20 26h24M20 34h16M20 42h20"></path>
+            </svg>
+          </div>
+          <h3 class="lp-card__title lp-heading">
+            <span class="lp-heading__jp">メニュー管理</span>
+            <span class="lp-heading__th">จัดการเมนู</span>
+          </h3>
+          <p class="muted lp-textPair">
+            <span class="lp-textPair__jp">メニュー名と単価を登録。メニュー別歩合の上書きにも対応しています。</span>
+            <span class="lp-textPair__th">บันทึกชื่อเมนูและราคา รองรับการกำหนดค่าคอมฯ รายเมนู</span>
+          </p>
+        </div>
+        <div class="lp-card lp-card--media">
+          <div class="lp-card__media lp-media lp-media--tile lp-media--sky">
+            <svg class="lp-media__icon" viewBox="0 0 64 64" aria-hidden="true">
+              <rect x="10" y="14" width="44" height="36" rx="8"></rect>
+              <circle cx="26" cy="28" r="5"></circle>
+              <path d="M20 42l10-10 8 8 8-8 8 10"></path>
+            </svg>
+          </div>
+          <h3 class="lp-card__title lp-heading">
+            <span class="lp-heading__jp">施術入力</span>
+            <span class="lp-heading__th">บันทึกการทำทรีตเมนต์</span>
+          </h3>
+          <p class="muted lp-textPair">
+            <span class="lp-textPair__jp">日付・セラピスト・メニュー・数量・メモを入力し、記録を一元化。</span>
+            <span class="lp-textPair__th">กรอกวันที่ พนักงาน เมนู จำนวน และหมายเหตุ รวมข้อมูลไว้ที่เดียว</span>
+          </p>
+        </div>
+        <div class="lp-card lp-card--media">
+          <div class="lp-card__media lp-media lp-media--tile lp-media--plum">
+            <svg class="lp-media__icon" viewBox="0 0 64 64" aria-hidden="true">
+              <rect x="10" y="14" width="44" height="36" rx="8"></rect>
+              <circle cx="32" cy="32" r="9"></circle>
+              <path d="M32 26v12M26 32h12"></path>
+            </svg>
+          </div>
+          <h3 class="lp-card__title lp-heading">
+            <span class="lp-heading__jp">簡単入力モード</span>
+            <span class="lp-heading__th">โหมดบันทึกแบบง่าย</span>
+          </h3>
+          <p class="muted lp-textPair">
+            <span class="lp-textPair__jp">スタッフ用の大きいボタンUIで、素早く記録が可能です。</span>
+            <span class="lp-textPair__th">ปุ่มใหญ่ใช้งานง่าย บันทึกได้รวดเร็ว</span>
+          </p>
+        </div>
+        <div class="lp-card lp-card--media">
+          <div class="lp-card__media lp-media lp-media--tile lp-media--gold">
+            <svg class="lp-media__icon" viewBox="0 0 64 64" aria-hidden="true">
+              <rect x="10" y="14" width="44" height="36" rx="8"></rect>
+              <path d="M22 42V30M32 42V24M42 42V34"></path>
+              <path d="M18 26H46"></path>
+            </svg>
+          </div>
+          <h3 class="lp-card__title lp-heading">
+            <span class="lp-heading__jp">日次レポート</span>
+            <span class="lp-heading__th">รายงานรายวัน</span>
+          </h3>
+          <p class="muted lp-textPair">
+            <span class="lp-textPair__jp">セラピスト別に売上と支払額を自動集計。支払済みの記録もできます。</span>
+            <span class="lp-textPair__th">สรุปยอดขายและยอดจ่ายแยกตามพนักงาน พร้อมบันทึกการจ่ายแล้ว</span>
+          </p>
+        </div>
+        <div class="lp-card lp-card--media">
+          <div class="lp-card__media lp-media lp-media--tile lp-media--jade">
+            <svg class="lp-media__icon" viewBox="0 0 64 64" aria-hidden="true">
+              <rect x="10" y="14" width="44" height="36" rx="8"></rect>
+              <path d="M22 24h20M22 32h20M22 40h20"></path>
+            </svg>
+          </div>
+          <h3 class="lp-card__title lp-heading">
+            <span class="lp-heading__jp">CSV出力</span>
+            <span class="lp-heading__th">ส่งออก CSV</span>
+          </h3>
+          <p class="muted lp-textPair">
+            <span class="lp-textPair__jp">Excelで開けるCSVで、印刷や会計処理にすぐ活用できます。</span>
+            <span class="lp-textPair__th">ส่งออกเป็น CSV เปิดใน Excel ได้ทันที</span>
+          </p>
+        </div>
+      </div>
+    </section>
+
+    <section id="gallery" class="lp-section">
+      <div class="lp-section__head">
+        <p class="lp-eyebrow">
+          <span class="lang-jp">ギャラリー</span>
+          <span class="lang-th">แกลเลอรี</span>
+        </p>
+        <h2 class="lp-heading">
+          <span class="lp-heading__jp">運用イメージ</span>
+          <span class="lp-heading__th">ภาพบรรยากาศการใช้งาน</span>
+        </h2>
+        <p class="muted lp-textPair">
+          <span class="lp-textPair__jp">日々の運用シーンを想定したビジュアルで、導入イメージを共有します。</span>
+          <span class="lp-textPair__th">ใช้ภาพตัวอย่างการใช้งานเพื่อช่วยให้เห็นภาพการนำไปใช้จริง</span>
+        </p>
+      </div>
+      <div class="lp-mediaGrid">
+        <figure class="lp-mediaCard">
+          <div class="lp-media lp-media--gallery lp-media--amber">
+            <img class="lp-media__img" src="{{ url_for('static', filename='lp/gallery-1.svg') }}" alt="Gallery visual" loading="lazy" />
+          </div>
+          <figcaption class="lp-mediaCard__caption">
+            <span class="lp-caption__jp">受付・会計</span>
+            <span class="lp-caption__th">การต้อนรับและคิดเงิน</span>
+          </figcaption>
+        </figure>
+        <figure class="lp-mediaCard">
+          <div class="lp-media lp-media--gallery lp-media--rose">
+            <img class="lp-media__img" src="{{ url_for('static', filename='lp/gallery-2.svg') }}" alt="Gallery visual" loading="lazy" />
+          </div>
+          <figcaption class="lp-mediaCard__caption">
+            <span class="lp-caption__jp">施術記録</span>
+            <span class="lp-caption__th">บันทึกการทำทรีตเมนต์</span>
+          </figcaption>
+        </figure>
+        <figure class="lp-mediaCard">
+          <div class="lp-media lp-media--gallery lp-media--gold">
+            <img class="lp-media__img" src="{{ url_for('static', filename='lp/gallery-3.svg') }}" alt="Gallery visual" loading="lazy" />
+          </div>
+          <figcaption class="lp-mediaCard__caption">
+            <span class="lp-caption__jp">日次レポート</span>
+            <span class="lp-caption__th">รายงานรายวัน</span>
+          </figcaption>
+        </figure>
+        <figure class="lp-mediaCard">
+          <div class="lp-media lp-media--gallery lp-media--jade">
+            <img class="lp-media__img" src="{{ url_for('static', filename='lp/gallery-4.svg') }}" alt="Gallery visual" loading="lazy" />
+          </div>
+          <figcaption class="lp-mediaCard__caption">
+            <span class="lp-caption__jp">スタッフ入力</span>
+            <span class="lp-caption__th">บันทึกโดยพนักงาน</span>
+          </figcaption>
+        </figure>
+        <figure class="lp-mediaCard">
+          <div class="lp-media lp-media--gallery lp-media--sky">
+            <img class="lp-media__img" src="{{ url_for('static', filename='lp/gallery-5.svg') }}" alt="Gallery visual" loading="lazy" />
+          </div>
+          <figcaption class="lp-mediaCard__caption">
+            <span class="lp-caption__jp">メニュー管理</span>
+            <span class="lp-caption__th">จัดการเมนู</span>
+          </figcaption>
+        </figure>
+        <figure class="lp-mediaCard">
+          <div class="lp-media lp-media--gallery lp-media--pearl">
+            <img class="lp-media__img" src="{{ url_for('static', filename='lp/gallery-6.svg') }}" alt="Gallery visual" loading="lazy" />
+          </div>
+          <figcaption class="lp-mediaCard__caption">
+            <span class="lp-caption__jp">セラピスト管理</span>
+            <span class="lp-caption__th">จัดการพนักงาน</span>
+          </figcaption>
+        </figure>
+        <figure class="lp-mediaCard">
+          <div class="lp-media lp-media--gallery lp-media--plum">
+            <img class="lp-media__img" src="{{ url_for('static', filename='lp/gallery-7.svg') }}" alt="Gallery visual" loading="lazy" />
+          </div>
+          <figcaption class="lp-mediaCard__caption">
+            <span class="lp-caption__jp">CSV出力</span>
+            <span class="lp-caption__th">ส่งออก CSV</span>
+          </figcaption>
+        </figure>
+        <figure class="lp-mediaCard">
+          <div class="lp-media lp-media--gallery lp-media--midnight">
+            <img class="lp-media__img" src="{{ url_for('static', filename='lp/gallery-8.svg') }}" alt="Gallery visual" loading="lazy" />
+          </div>
+          <figcaption class="lp-mediaCard__caption">
+            <span class="lp-caption__jp">日払い精算</span>
+            <span class="lp-caption__th">สรุปการจ่ายรายวัน</span>
+          </figcaption>
+        </figure>
+      </div>
+    </section>
+
+    <section class="lp-section">
+      <div class="lp-section__head">
+        <p class="lp-eyebrow">
+          <span class="lang-jp">導入フロー</span>
+          <span class="lang-th">ขั้นตอน</span>
+        </p>
+        <h2 class="lp-heading">
+          <span class="lp-heading__jp">導入までの流れ</span>
+          <span class="lp-heading__th">ขั้นตอนการเริ่มใช้งาน</span>
+        </h2>
+        <p class="muted lp-textPair">
+          <span class="lp-textPair__jp">初期設定から日々の運用まで、最短ステップで開始できます。</span>
+          <span class="lp-textPair__th">เริ่มใช้งานได้เร็ว ตั้งแต่ตั้งค่าแรกจนถึงการใช้งานประจำวัน</span>
+        </p>
+      </div>
+      <div class="lp-steps">
+        <div class="lp-step">
+          <div class="lp-step__index">01</div>
+          <div class="lp-step__body">
+            <h3 class="lp-heading">
+              <span class="lp-heading__jp">初期設定</span>
+              <span class="lp-heading__th">ตั้งค่าเริ่มต้น</span>
+            </h3>
+            <p class="lp-textPair">
+              <span class="lp-textPair__jp">セラピストとメニューを登録し、歩合や単価を整えます。</span>
+              <span class="lp-textPair__th">เพิ่มรายชื่อพนักงานและเมนู ตั้งค่าค่าคอมฯ และราคา</span>
+            </p>
+          </div>
+        </div>
+        <div class="lp-step">
+          <div class="lp-step__index">02</div>
+          <div class="lp-step__body">
+            <h3 class="lp-heading">
+              <span class="lp-heading__jp">日々の入力</span>
+              <span class="lp-heading__th">บันทึกประจำวัน</span>
+            </h3>
+            <p class="lp-textPair">
+              <span class="lp-textPair__jp">施術が終わったら簡単入力で記録。いつでも履歴を確認できます。</span>
+              <span class="lp-textPair__th">หลังบริการเสร็จ บันทึกทันที ตรวจสอบประวัติได้ทุกเมื่อ</span>
+            </p>
+          </div>
+        </div>
+        <div class="lp-step">
+          <div class="lp-step__index">03</div>
+          <div class="lp-step__body">
+            <h3 class="lp-heading">
+              <span class="lp-heading__jp">日次レポートで精算</span>
+              <span class="lp-heading__th">สรุปยอดรายวัน</span>
+            </h3>
+            <p class="lp-textPair">
+              <span class="lp-textPair__jp">売上と支払額を確認し、支払済みの記録まで完結します。</span>
+              <span class="lp-textPair__th">ตรวจสอบยอดขายและยอดจ่ายให้เสร็จในรายงานรายวัน</span>
+            </p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section id="contact" class="lp-ctaPanel">
+      <div class="lp-ctaPanel__inner">
+        <p class="lp-eyebrow lp-eyebrow--light">
+          <span class="lang-jp">オーナー向け</span>
+          <span class="lang-th">สำหรับเจ้าของร้าน</span>
+        </p>
+        <h2 class="lp-heading">
+          <span class="lp-heading__jp">導入のご相談</span>
+          <span class="lp-heading__th">ปรึกษาการนำไปใช้</span>
+        </h2>
+        <p class="lp-textPair">
+          <span class="lp-textPair__jp">個人サロンの運用に合わせて、最小限の設定でスタートできます。導入イメージや運用フローのご相談はお気軽にどうぞ。</span>
+          <span class="lp-textPair__th">เริ่มต้นง่าย ปรับให้เหมาะกับซาลอนส่วนตัวได้ หากต้องการคำแนะนำเรื่องการใช้งานสามารถสอบถามได้</span>
+        </p>
+        <div class="lp-ctaPanel__actions">
+          <a class="btn lp-cta" href="{{ url_for('index') }}">
+            <span class="lang-jp">アプリを見る</span>
+            <span class="lang-th">ดูตัวระบบ</span>
+          </a>
+          <a class="btn btn--secondary lp-cta lp-cta--ghost" href="#features">
+            <span class="lang-jp">機能一覧へ</span>
+            <span class="lang-th">ฟังก์ชันทั้งหมด</span>
+          </a>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+    (() => {
+      const landing = document.querySelector(".landing");
+      const toggle = document.getElementById("lang-toggle");
+      if (!landing || !toggle) {
+        return;
+      }
+      const stored = localStorage.getItem("landingLang");
+      const initial = stored === "th" ? "th" : "jp";
+
+      const applyLang = (lang) => {
+        landing.dataset.lang = lang;
+        toggle.dataset.lang = lang;
+        toggle.setAttribute("aria-pressed", lang === "th" ? "true" : "false");
+      };
+
+      applyLang(initial);
+      toggle.addEventListener("click", () => {
+        const next = landing.dataset.lang === "th" ? "jp" : "th";
+        applyLang(next);
+        localStorage.setItem("landingLang", next);
+      });
+    })();
+  </script>
+{% endblock %}

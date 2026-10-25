@@ -1,0 +1,69 @@
+{% extends "base.html" %}
+{% set title = "月次カレンダー" %}
+{% block content %}
+  <div class="page-head">
+    <h1>月次カレンダー</h1>
+    <p class="muted">月の売上と総客数を日別に確認できます。</p>
+  </div>
+
+  <section class="card">
+    <h2>対象月</h2>
+    <form class="inline" method="get" action="{{ url_for('report_monthly') }}">
+      <a class="btn btn--secondary" href="{{ url_for('report_monthly', month=prev_month) }}">前月</a>
+      <label>月
+        <input name="month" type="month" value="{{ month }}" data-auto-submit />
+      </label>
+      <button class="btn btn--secondary" type="submit">表示</button>
+      <a class="btn btn--secondary" href="{{ url_for('report_monthly', month=next_month) }}">翌月</a>
+      <a class="btn btn--secondary" href="{{ url_for('admin') }}">管理へ戻る</a>
+    </form>
+  </section>
+
+  <section class="card">
+    <h2>{{ month_label }} 合計</h2>
+    <div class="monthlySummary">
+      <div class="monthlySummary__item">
+        <span class="monthlySummary__label">売上合計</span>
+        <span class="monthlySummary__value mono">{{ "{:,}".format(totals.sales) }}円</span>
+      </div>
+      <div class="monthlySummary__item">
+        <span class="monthlySummary__label">総客数</span>
+        <span class="monthlySummary__value mono">{{ totals.customers }}人</span>
+      </div>
+      <div class="monthlySummary__item">
+        <span class="monthlySummary__label">入力日数</span>
+        <span class="monthlySummary__value mono">{{ totals.active_days }}日</span>
+      </div>
+    </div>
+  </section>
+
+  <section class="card">
+    <h2>{{ month_label }}</h2>
+    <div class="monthlyCalendarWrap">
+      <div class="monthlyCalendar">
+        {% for label in weekday_labels %}
+          <div class="monthlyCalendar__weekday{% if loop.index0 >= 5 %} monthlyCalendar__weekday--weekend{% endif %}">{{ label }}</div>
+        {% endfor %}
+
+        {% for week in weeks %}
+          {% for day in week %}
+            {% if day.date %}
+              <a class="monthlyCalendar__day{% if day.weekday >= 5 %} monthlyCalendar__day--weekend{% endif %}{% if day.is_today %} monthlyCalendar__day--today{% endif %}" href="{{ url_for('report_daily', date=day.date) }}">
+                <span class="monthlyCalendar__date mono">{{ day.day }}</span>
+                {% if day.has_record %}
+                  <span class="monthlyCalendar__metric">売上 {{ "{:,}".format(day.sales) }}円</span>
+                  <span class="monthlyCalendar__metric">客数 {{ day.customers }}人</span>
+                {% else %}
+                  <span class="monthlyCalendar__empty">記録なし</span>
+                {% endif %}
+              </a>
+            {% else %}
+              <div class="monthlyCalendar__day monthlyCalendar__day--blank" aria-hidden="true"></div>
+            {% endif %}
+          {% endfor %}
+        {% endfor %}
+      </div>
+    </div>
+    <p class="muted small">各日付を押すと、その日の詳細レポートを開けます。</p>
+  </section>
+{% endblock %}

@@ -29,6 +29,23 @@ python run.py
 
 セラピスト向けの簡単画面は `http://localhost:5000/kiosk` です。
 
+ランディングページは `http://localhost:5000/lp` です。
+
+## ロゴの表示（トップ画面）
+
+トップ画面にロゴを表示したい場合は、`app/static/` に画像を置いてください。
+
+- 自動検出: `logo.svg` / `logo.png` / `logo.webp` / `logo.jpg` / `logo.jpeg`
+- 任意ファイル名を使いたい場合: 環境変数 `SALON_LOGO_FILENAME` で指定
+- 代替テキストを変えたい場合: `SALON_LOGO_ALT` で指定
+
+例:
+
+```bash
+export SALON_LOGO_FILENAME="shop_logo.png"
+export SALON_LOGO_ALT="店舗ロゴ"
+```
+
 ## データ保存場所
 
 - SQLiteファイルは `data/salon.sqlite3` に保存されます。

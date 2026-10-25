@@ -1,5 +1,9 @@
 .venv/
+venv/
 __pycache__/
 *.pyc
 data/
 .DS_Store
+
+# Local deploy secrets (copy from scripts/deploy-local.example.bat)
+scripts/deploy-local.bat
